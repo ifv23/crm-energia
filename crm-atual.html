@@ -329,7 +329,10 @@ tr:active td{background:#2a2a2a;}
 <div class="pg" id="pg-readings">
   <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:14px;flex-wrap:wrap;gap:8px;">
     <div style="font-size:13px;color:#808080">Mês: <strong id="read-month" style="color:#2ecc71"></strong></div>
-    <button class="btn bp" onclick="openBulkUpload()">📤 Upload em massa</button>
+<div style="display:flex;gap:8px;">
+      <button class="btn bp" style="flex:1;justify-content:center;font-size:11px" onclick="openBulkUpload('prev')">📤 Anteriores</button>
+      <button class="btn bp" style="flex:1;justify-content:center;font-size:11px" onclick="openBulkUpload('cur')">📤 Atuais</button>
+    </div>
   </div>
   <div id="read-list"></div>
 </div>
@@ -1546,9 +1549,14 @@ if(!('ontouchstart' in window) && !navigator.maxTouchPoints){
 
 // ── BULK UPLOAD ────────────────────────────────────────────────────────────
 let bulkPendingResults = [];
+let bulkWhich = "cur"; // "cur" or "prev"
 
-function openBulkUpload(){
+function openBulkUpload(which){
+  bulkWhich = which || "cur";
   bulkPendingResults = [];
+  const label = bulkWhich==="prev" ? "leituras anteriores ("+mlbl(PREV)+")" : "leituras atuais ("+mlbl(CUR)+")";
+  document.querySelector("#modal-bulk h3").textContent = "📤 Upload em massa — " + (bulkWhich==="prev"?"Anteriores":"Atuais");
+  document.querySelector("#modal-bulk .msub").textContent = `Selecione as fotos dos medidores referentes às ${label}. A IA identifica o inquilino pelo número de série e pelo valor.`;
   document.getElementById("bulk-ut").textContent = "📷 Selecionar fotos (múltiplas)";
   document.getElementById("bulk-progress").style.display = "none";
   document.getElementById("bulk-results").style.display = "none";
@@ -1627,9 +1635,26 @@ Se não conseguir ler algum campo, use null.`}
 }
 
 function getLastKnownReading(tid){
-  const rdgs = S.readings[tid]||[];
+  // Reference month = the month BEFORE the one we are uploading
+  // If uploading "cur" (maio), reference = PREV (abril)
+  // If uploading "prev" (abril), reference = month before abril (março)
+  const uploadMonth = bulkWhich==="prev" ? PREV : CUR;
+  const refMonth = mprev(uploadMonth);
+
+  const rdgs = (S.readings[tid]||[]).filter(r => r.value > 10);
   if(!rdgs.length) return null;
-  return [...rdgs].sort((a,b)=>b.month.localeCompare(a.month))[0].value;
+
+  // First try: exact match on reference month
+  const exact = rdgs.find(r => r.month === refMonth);
+  if(exact) return exact.value;
+
+  // Fallback: most recent reading strictly before upload month
+  const before = rdgs
+    .filter(r => r.month < uploadMonth)
+    .sort((a,b) => b.month.localeCompare(a.month));
+  if(before.length) return before[0].value;
+
+  return null;
 }
 
 function renderBulkResults(){
@@ -1657,13 +1682,8 @@ function renderBulkResults(){
             <option value="">— Não salvar —</option>
             ${activeTenants.map(t=>`<option value="${t.id}" ${r.chosenTid===t.id?"selected":""}>${t.name} (${t.unit})</option>`).join("")}
           </select>
-          <div style="display:flex;gap:12px;">
-            <label style="display:flex;align-items:center;gap:5px;cursor:pointer;font-size:12px;color:#9EA3BF;">
-              <input type="radio" name="bulk-which-${i}" value="cur" checked style="accent-color:#217346"> Leitura atual
-            </label>
-            <label style="display:flex;align-items:center;gap:5px;cursor:pointer;font-size:12px;color:#9EA3BF;">
-              <input type="radio" name="bulk-which-${i}" value="prev" style="accent-color:#217346"> Leitura anterior
-            </label>
+          <div style="font-size:11px;color:#808080;margin-top:4px;">
+            Será salvo como: <b style="color:#2ecc71">${bulkWhich==="prev"?"Leitura anterior ("+mlbl(PREV)+")":"Leitura atual ("+mlbl(CUR)+")"}</b>
           </div>
         </div>
       </div>
@@ -1678,13 +1698,11 @@ function confirmBulk(){
   let saved=0;
   bulkPendingResults.forEach((r,i)=>{
     if(!r.chosenTid||r.reading==null) return;
-    const whichEl=document.querySelector(`input[name="bulk-which-${i}"]:checked`);
-    const which=whichEl?whichEl.value:"cur";
-    const month=which==="prev"?PREV:CUR;
+    const month=bulkWhich==="prev"?PREV:CUR;
     saveRd(r.chosenTid,month,r.reading);
     if(!S.photoHistory[month]) S.photoHistory[month]={};
     if(!S.photoHistory[month][r.chosenTid]) S.photoHistory[month][r.chosenTid]={};
-    if(r.b64) S.photoHistory[month][r.chosenTid][which]={type:"photo",b64:r.b64,mime:r.mime};
+    if(r.b64) S.photoHistory[month][r.chosenTid][bulkWhich]={type:"photo",b64:r.b64,mime:r.mime};
     saved++;
   });
   saveState();
