@@ -327,11 +327,11 @@ tr:active td{background:#2a2a2a;}
 
 <!-- LEITURAS -->
 <div class="pg" id="pg-readings">
-  <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:14px;flex-wrap:wrap;gap:8px;">
-    <div style="font-size:13px;color:#808080">Mês: <strong id="read-month" style="color:#2ecc71"></strong></div>
-<div style="display:flex;gap:8px;">
-      <button class="btn bp" style="flex:1;justify-content:center;font-size:11px" onclick="openBulkUpload('prev')">📤 Anteriores</button>
-      <button class="btn bp" style="flex:1;justify-content:center;font-size:11px" onclick="openBulkUpload('cur')">📤 Atuais</button>
+  <div style="margin-bottom:12px;">
+    <div style="font-size:13px;color:#808080;margin-bottom:8px;">Mês: <strong id="read-month" style="color:#2ecc71"></strong></div>
+    <div style="display:flex;gap:8px;">
+      <button class="btn bp" style="flex:1;justify-content:center;min-height:44px;" onclick="openBulkUpload('prev')">📤 Upload anteriores</button>
+      <button class="btn bp" style="flex:1;justify-content:center;min-height:44px;" onclick="openBulkUpload('cur')">📤 Upload atuais</button>
     </div>
   </div>
   <div id="read-list"></div>
