@@ -355,7 +355,7 @@ tr:active td{background:#2a2a2a;}
     <div style="margin-bottom:14px"><div class="fl">WhatsApp (55+DDD+número)</div><input type="text" id="n-phone" placeholder="5511987654321"/></div>
     <button class="btn bp" onclick="addTenant()">Adicionar</button>
   </div>
-  <div class="card"><div class="ct">👥 Cadastrados</div><div class="tw"><table><thead><tr><th>Nome</th><th>Unidade</th><th>WhatsApp</th><th>Status</th><th></th></tr></thead><tbody id="ten-tb"></tbody></table></div></div>
+  <div class="card"><div class="ct">👥 Cadastrados</div><div class="tw"><table><thead><tr><th>Nome</th><th>WhatsApp</th><th>Status</th><th>Ações</th></tr></thead><tbody id="ten-tb"></tbody></table></div></div>
 </div>
 
 <!-- CONFIG -->
@@ -897,20 +897,21 @@ function confirmEditTenant(){
   const unit = document.getElementById("et-unit").value.trim();
   const phone = document.getElementById("et-phone").value.trim();
   if(!name||!unit||!phone){toast("Preencha todos os campos.",true);return;}
+  if(!confirm(`Salvar alterações para "${name}"?`)) return;
   const t = S.tenants.find(x=>x.id===id);
   if(t){ t.name=name; t.unit=unit; t.phone=phone; }
-  saveState(); closeM("modal-edit-tenant"); toast("✅ Inquilino atualizado!"); render();
+  saveState(); closeM("modal-edit-tenant"); toast("✅ "+name+" atualizado!"); render();
 }
 function deleteTenant(id){
   const t = S.tenants.find(x=>x.id===id);
   if(!t) return;
-  if(!confirm("Excluir "+t.name+"? Isso remove também todas as leituras e cobranças.")) return;
+  if(!confirm(`Excluir "${t.name}" (${t.unit})?\n\nIsso remove também todas as leituras, fotos e cobranças deste inquilino. Esta ação não pode ser desfeita.`)) return;
   S.tenants = S.tenants.filter(x=>x.id!==id);
   delete S.readings[id];
   delete S.charges[id];
-  Object.keys(S.chargesHistory).forEach(m=>{ if(S.chargesHistory[m][id]) delete S.chargesHistory[m][id]; });
-  Object.keys(S.photoHistory).forEach(m=>{ if(S.photoHistory[m][id]) delete S.photoHistory[m][id]; });
-  saveState(); toast("🗑️ Inquilino excluído."); render();
+  Object.keys(S.chargesHistory).forEach(m=>{ if(S.chargesHistory[m]&&S.chargesHistory[m][id]) delete S.chargesHistory[m][id]; });
+  Object.keys(S.photoHistory).forEach(m=>{ if(S.photoHistory[m]&&S.photoHistory[m][id]) delete S.photoHistory[m][id]; });
+  saveState(); toast("🗑️ "+t.name+" excluído."); render();
 }
 // ── CALCULAR ───────────────────────────────────────────────────────────────
 function calcAllSilent(){
@@ -1216,10 +1217,16 @@ function render(){
   renderHistory();
 
   document.getElementById("ten-tb").innerHTML=S.tenants.map(t=>`<tr>
-    <td><b>${t.name}</b></td><td>${t.unit}</td>
-    <td style="font-family:monospace;font-size:12px;color:#9EA3BF">${t.phone}</td>
-    <td><span style="background:${t.active?"#0A2200":"#3A0000"};color:${t.active?"var(--grn)":"var(--red)"};padding:3px 10px;border-radius:20px;font-size:11px;font-weight:700">${t.active?"Ativo":"Inativo"}</span></td>
-    <td><button class="btn bg bs2" onclick="S.tenants.find(x=>x.id===${t.id}).active=!S.tenants.find(x=>x.id===${t.id}).active;saveState();render()">${t.active?"Desativar":"Ativar"}</button></td>
+    <td><b>${t.name}</b><br><span style="font-size:11px;color:#808080">${t.unit}</span></td>
+    <td style="font-family:monospace;font-size:11px;color:#999">${t.phone}</td>
+    <td><span style="background:${t.active?"#0d2b0d":"#3a1a1a"};color:${t.active?"#4caf50":"#e74c3c"};padding:3px 8px;border-radius:3px;font-size:11px;font-weight:700">${t.active?"Ativo":"Inativo"}</span></td>
+    <td>
+      <div style="display:flex;gap:4px;flex-wrap:wrap;">
+        <button class="btn bg bs2" onclick="openEditTenant(${t.id})">✏️ Editar</button>
+        <button class="btn bg bs2" onclick="S.tenants.find(x=>x.id===${t.id}).active=!S.tenants.find(x=>x.id===${t.id}).active;saveState();render()">${t.active?"⏸ Inativar":"▶ Ativar"}</button>
+        <button class="btn bs2" style="background:#3a1a1a;color:#e74c3c;border:1px solid #5a2a2a;" onclick="deleteTenant(${t.id})">🗑️ Excluir</button>
+      </div>
+    </td>
   </tr>`).join("");
 }
 
