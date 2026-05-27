@@ -327,7 +327,10 @@ tr:active td{background:#2a2a2a;}
 
 <!-- LEITURAS -->
 <div class="pg" id="pg-readings">
-  <div style="font-size:13px;color:#808080;margin-bottom:14px;">Mês: <strong id="read-month" style="color:#2ecc71"></strong></div>
+  <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:14px;flex-wrap:wrap;gap:8px;">
+    <div style="font-size:13px;color:#808080">Mês: <strong id="read-month" style="color:#2ecc71"></strong></div>
+    <button class="btn bp" onclick="openBulkUpload()">📤 Upload em massa</button>
+  </div>
   <div id="read-list"></div>
 </div>
 
@@ -392,6 +395,37 @@ tr:active td{background:#2a2a2a;}
 </div>
 
 
+
+<!-- MODAL BULK UPLOAD -->
+<div class="mb" id="modal-bulk">
+  <div class="md" style="max-width:520px">
+    <h3>📤 Upload em massa</h3>
+    <p class="msub">Selecione todas as fotos dos medidores de uma vez. A IA identifica automaticamente qual é de qual inquilino pelo número de série e pelo valor do display.</p>
+    <div style="margin-bottom:14px">
+      <label class="uz">
+        <span id="bulk-ut">📷 Selecionar fotos (múltiplas)</span>
+        <input type="file" id="bulk-files" accept="image/*" multiple style="display:none" onchange="handleBulkUpload(this)"/>
+      </label>
+    </div>
+    <div id="bulk-progress" style="display:none;margin-bottom:14px;">
+      <div style="font-size:12px;color:#808080;margin-bottom:8px;" id="bulk-progress-text">Processando...</div>
+      <div style="background:#1a1a1a;border-radius:3px;height:6px;overflow:hidden;">
+        <div id="bulk-progress-bar" style="background:#217346;height:100%;width:0%;transition:width .3s;"></div>
+      </div>
+    </div>
+    <div id="bulk-results" style="display:none;">
+      <div style="font-size:12px;font-weight:600;color:#d4d4d4;margin-bottom:10px;" id="bulk-summary"></div>
+      <div id="bulk-items" style="max-height:320px;overflow-y:auto;display:flex;flex-direction:column;gap:8px;"></div>
+      <div style="display:flex;gap:8px;margin-top:14px;">
+        <button class="btn bg" style="flex:1;justify-content:center" onclick="closeM('modal-bulk')">Cancelar</button>
+        <button class="btn bp" style="flex:1;justify-content:center" onclick="confirmBulk()">✅ Salvar todas</button>
+      </div>
+    </div>
+    <div style="display:flex;gap:8px;margin-top:4px;" id="bulk-cancel-row">
+      <button class="btn bg" style="flex:1;justify-content:center" onclick="closeM('modal-bulk')">Fechar</button>
+    </div>
+  </div>
+</div>
 <!-- MODAL EDITAR INQUILINO -->
 <div class="mb" id="modal-edit-tenant">
   <div class="md">
@@ -399,7 +433,8 @@ tr:active td{background:#2a2a2a;}
     <p class="msub">Atualize os dados do inquilino.</p>
     <div style="margin-bottom:10px"><div class="fl">Nome</div><input type="text" id="et-name" placeholder="Nome completo"/></div>
     <div style="margin-bottom:10px"><div class="fl">Unidade</div><input type="text" id="et-unit" placeholder="Ex: Apt 301"/></div>
-    <div style="margin-bottom:16px"><div class="fl">WhatsApp</div><input type="text" id="et-phone" placeholder="5511987654321"/></div>
+    <div style="margin-bottom:10px"><div class="fl">WhatsApp</div><input type="text" id="et-phone" placeholder="5511987654321"/></div>
+    <div style="margin-bottom:16px"><div class="fl">Nº de série do medidor</div><input type="text" id="et-serial" placeholder="Ex: 2158408"/></div>
     <input type="hidden" id="et-id"/>
     <div style="display:flex;gap:8px;">
       <button class="btn bg" style="flex:1;justify-content:center" onclick="closeM('modal-edit-tenant')">Cancelar</button>
@@ -889,6 +924,7 @@ function openEditTenant(id){
   document.getElementById("et-name").value = t.name;
   document.getElementById("et-unit").value = t.unit;
   document.getElementById("et-phone").value = t.phone;
+  document.getElementById("et-serial").value = t.serial||"";
   openM("modal-edit-tenant");
 }
 function confirmEditTenant(){
@@ -899,7 +935,8 @@ function confirmEditTenant(){
   if(!name||!unit||!phone){toast("Preencha todos os campos.",true);return;}
   if(!confirm(`Salvar alterações para "${name}"?`)) return;
   const t = S.tenants.find(x=>x.id===id);
-  if(t){ t.name=name; t.unit=unit; t.phone=phone; }
+  const serial=document.getElementById("et-serial").value.trim();
+  if(t){ t.name=name; t.unit=unit; t.phone=phone; t.serial=serial; }
   saveState(); closeM("modal-edit-tenant"); toast("✅ "+name+" atualizado!"); render();
 }
 function deleteTenant(id){
@@ -977,9 +1014,10 @@ function addTenant(){
   const name=document.getElementById("n-name").value.trim();
   const unit=document.getElementById("n-unit").value.trim();
   const phone=document.getElementById("n-phone").value.trim();
+  const serial=document.getElementById("n-serial").value.trim();
   if(!name||!unit||!phone){toast("Preencha todos os campos.",true);return;}
-  S.tenants.push({id:Date.now(),name,unit,phone,active:true});
-  document.getElementById("n-name").value="";document.getElementById("n-unit").value="";document.getElementById("n-phone").value="";
+  S.tenants.push({id:Date.now(),name,unit,phone,serial,active:true});
+  document.getElementById("n-name").value="";document.getElementById("n-unit").value="";document.getElementById("n-phone").value="";document.getElementById("n-serial").value="";
   saveState(); toast(`✅ ${name} adicionado!`); render();
 }
 
@@ -1217,7 +1255,7 @@ function render(){
   renderHistory();
 
   document.getElementById("ten-tb").innerHTML=S.tenants.map(t=>`<tr>
-    <td><b>${t.name}</b><br><span style="font-size:11px;color:#808080">${t.unit}</span></td>
+    <td><b>${t.name}</b><br><span style="font-size:11px;color:#808080">${t.unit}</span>${t.serial?`<br><span style="font-size:10px;color:#606060">S/N: ${t.serial}</span>`:""}</td>
     <td style="font-family:monospace;font-size:11px;color:#999">${t.phone}</td>
     <td><span style="background:${t.active?"#0d2b0d":"#3a1a1a"};color:${t.active?"#4caf50":"#e74c3c"};padding:3px 8px;border-radius:3px;font-size:11px;font-weight:700">${t.active?"Ativo":"Inativo"}</span></td>
     <td>
@@ -1504,6 +1542,156 @@ async function manualRefresh(){
 if(!('ontouchstart' in window) && !navigator.maxTouchPoints){
   const btn = document.getElementById("drive-refresh-btn");
   if(btn) btn.style.display="";
+}
+
+// ── BULK UPLOAD ────────────────────────────────────────────────────────────
+let bulkPendingResults = [];
+
+function openBulkUpload(){
+  bulkPendingResults = [];
+  document.getElementById("bulk-ut").textContent = "📷 Selecionar fotos (múltiplas)";
+  document.getElementById("bulk-progress").style.display = "none";
+  document.getElementById("bulk-results").style.display = "none";
+  document.getElementById("bulk-cancel-row").style.display = "";
+  document.getElementById("bulk-files").value = "";
+  openM("modal-bulk");
+}
+
+async function handleBulkUpload(input){
+  const files = [...input.files];
+  if(!files.length) return;
+  if(!S.apiKey){ toast("Configure a chave API em ⚙️ Config.",true); return; }
+
+  document.getElementById("bulk-ut").textContent = `✅ ${files.length} foto(s) selecionada(s)`;
+  document.getElementById("bulk-progress").style.display = "block";
+  document.getElementById("bulk-results").style.display = "none";
+  document.getElementById("bulk-cancel-row").style.display = "none";
+
+  bulkPendingResults = [];
+  const activeTenants = S.tenants.filter(t=>t.active);
+
+  for(let i=0; i<files.length; i++){
+    const file = files[i];
+    const pct = Math.round((i/files.length)*100);
+    document.getElementById("bulk-progress-bar").style.width = pct+"%";
+    document.getElementById("bulk-progress-text").textContent = `Analisando foto ${i+1} de ${files.length}...`;
+
+    try{
+      const b64 = await fileToB64(file);
+      const res = await claude([{role:"user",content:[
+        {type:"image",source:{type:"base64",media_type:file.type,data:b64}},
+        {type:"text",text:`Foto de medidor de energia elétrica. Extraia:
+1. Valor numérico do display/visor (kWh)
+2. Número de série do medidor (na plaquinha frontal — S/N, Nr Serie, Serial, ou número próximo ao código de barras)
+Responda SOMENTE JSON: {"reading":21760,"serial":"2158408"}
+Se não conseguir ler algum campo, use null.`}
+      ]}]);
+
+      const reading = res.reading || null;
+      const serial = res.serial ? String(res.serial).trim() : null;
+
+      let suggestedTid = null, confidence = "low", matchReason = "";
+
+      // Level 1: match by serial
+      if(serial){
+        const bySerial = activeTenants.find(t => t.serial && t.serial.replace(/\s/g,"") === serial.replace(/\s/g,""));
+        if(bySerial){ suggestedTid=bySerial.id; confidence="high"; matchReason="número de série: "+serial; }
+      }
+
+      // Level 2: match by value
+      if(!suggestedTid && reading!=null){
+        const candidates = [];
+        activeTenants.forEach(t=>{
+          const last = getLastKnownReading(t.id);
+          if(last!=null){ const diff=reading-last; if(diff>=0&&diff<=700) candidates.push({t,diff,last}); }
+        });
+        if(candidates.length===1){
+          suggestedTid=candidates[0].t.id; confidence="medium";
+          matchReason=`valor próximo à última leitura (${candidates[0].last} kWh, diff: ${candidates[0].diff} kWh)`;
+        } else if(candidates.length>1){
+          matchReason=`${candidates.length} candidatos: ${candidates.map(x=>x.t.name).join(", ")}`;
+        } else if(reading!=null){
+          matchReason="nenhuma leitura anterior compatível";
+        }
+      }
+
+      bulkPendingResults.push({b64,mime:file.type,reading,serial,suggestedTid,confidence,matchReason,chosenTid:suggestedTid});
+    }catch(e){
+      bulkPendingResults.push({b64:null,mime:file.type,reading:null,serial:null,suggestedTid:null,confidence:"error",matchReason:"Erro: "+e.message,chosenTid:null});
+    }
+  }
+
+  document.getElementById("bulk-progress-bar").style.width="100%";
+  document.getElementById("bulk-progress-text").textContent="Concluído!";
+  setTimeout(()=>{ document.getElementById("bulk-progress").style.display="none"; renderBulkResults(); },500);
+}
+
+function getLastKnownReading(tid){
+  const rdgs = S.readings[tid]||[];
+  if(!rdgs.length) return null;
+  return [...rdgs].sort((a,b)=>b.month.localeCompare(a.month))[0].value;
+}
+
+function renderBulkResults(){
+  const high=bulkPendingResults.filter(r=>r.confidence==="high").length;
+  const med=bulkPendingResults.filter(r=>r.confidence==="medium").length;
+  const low=bulkPendingResults.filter(r=>r.confidence==="low"||r.confidence==="error").length;
+  document.getElementById("bulk-summary").textContent=`${bulkPendingResults.length} fotos — ✅ ${high} certas · ⚠️ ${med} prováveis · ❓ ${low} incertas`;
+
+  const activeTenants = S.tenants.filter(t=>t.active);
+  document.getElementById("bulk-items").innerHTML = bulkPendingResults.map((r,i)=>{
+    const cc=r.confidence==="high"?"#4caf50":r.confidence==="medium"?"#f0a500":"#e74c3c";
+    const cl=r.confidence==="high"?"✅ Certeza":r.confidence==="medium"?"⚠️ Provável":"❓ Incerto";
+    return `<div style="background:#1a1a1a;border-radius:4px;padding:12px;border-left:3px solid ${cc}">
+      <div style="display:flex;gap:10px;align-items:flex-start;">
+        ${r.b64?`<img src="data:${r.mime};base64,${r.b64}" style="width:60px;height:60px;object-fit:cover;border-radius:3px;flex-shrink:0;border:1px solid #404040"/>`:'<div style="width:60px;height:60px;background:#252525;border-radius:3px;display:flex;align-items:center;justify-content:center;color:#808080;font-size:20px;flex-shrink:0">❌</div>'}
+        <div style="flex:1;min-width:0;">
+          <div style="display:flex;align-items:center;gap:6px;margin-bottom:4px;flex-wrap:wrap;">
+            <span style="font-size:11px;font-weight:700;color:${cc}">${cl}</span>
+            ${r.reading!=null?`<span style="font-size:13px;color:#d4d4d4;font-weight:700">${r.reading} kWh</span>`:""}
+            ${r.serial?`<span style="font-size:10px;color:#808080">S/N: ${r.serial}</span>`:""}
+          </div>
+          ${r.matchReason?`<div style="font-size:11px;color:#808080;margin-bottom:6px">${r.matchReason}</div>`:""}
+          <select onchange="bulkPendingResults[${i}].chosenTid=this.value?Number(this.value):null"
+            style="background:#252525;border:1px solid #505050;border-radius:3px;color:#d4d4d4;font-size:12px;padding:5px 8px;width:100%;margin-bottom:6px;">
+            <option value="">— Não salvar —</option>
+            ${activeTenants.map(t=>`<option value="${t.id}" ${r.chosenTid===t.id?"selected":""}>${t.name} (${t.unit})</option>`).join("")}
+          </select>
+          <div style="display:flex;gap:12px;">
+            <label style="display:flex;align-items:center;gap:5px;cursor:pointer;font-size:12px;color:#9EA3BF;">
+              <input type="radio" name="bulk-which-${i}" value="cur" checked style="accent-color:#217346"> Leitura atual
+            </label>
+            <label style="display:flex;align-items:center;gap:5px;cursor:pointer;font-size:12px;color:#9EA3BF;">
+              <input type="radio" name="bulk-which-${i}" value="prev" style="accent-color:#217346"> Leitura anterior
+            </label>
+          </div>
+        </div>
+      </div>
+    </div>`;
+  }).join("");
+
+  document.getElementById("bulk-results").style.display="block";
+  document.getElementById("bulk-cancel-row").style.display="";
+}
+
+function confirmBulk(){
+  let saved=0;
+  bulkPendingResults.forEach((r,i)=>{
+    if(!r.chosenTid||r.reading==null) return;
+    const whichEl=document.querySelector(`input[name="bulk-which-${i}"]:checked`);
+    const which=whichEl?whichEl.value:"cur";
+    const month=which==="prev"?PREV:CUR;
+    saveRd(r.chosenTid,month,r.reading);
+    if(!S.photoHistory[month]) S.photoHistory[month]={};
+    if(!S.photoHistory[month][r.chosenTid]) S.photoHistory[month][r.chosenTid]={};
+    if(r.b64) S.photoHistory[month][r.chosenTid][which]={type:"photo",b64:r.b64,mime:r.mime};
+    saved++;
+  });
+  saveState();
+  closeM("modal-bulk");
+  toast(`✅ ${saved} leitura(s) salvas!`);
+  setTimeout(()=>calcAllSilent(),300);
+  render();
 }
 (function(){
   let startY=0, pulling=false, triggered=false;
