@@ -1757,12 +1757,9 @@ function handleBackdropClick(e, modalId){
     const md=e.target.closest('.md');
     const mb=e.target.closest('.mb');
     if(md&&mb&&mb.classList.contains('on')){
-      const rect=md.getBoundingClientRect();
-      if(startY-rect.top<48){
-        mdActive=true; mdEl=md; mdId=mb.id;
-        mdEl.style.transition='none';
-        return;
-      }
+      mdActive=true; mdEl=md; mdId=mb.id;
+      mdEl.style.transition='none';
+      return;
     }
 
     // PTR: only when no modal open and at top of page
@@ -1779,9 +1776,8 @@ function handleBackdropClick(e, modalId){
     if(mdActive&&mdEl){
       if(dy>0&&dx<dy){ // predominantly vertical downward
         mdEl.style.transform=`translateY(${dy}px)`;
-        mdEl.style.opacity=String(Math.max(0.3,1-dy/200));
       }
-      return; // don't trigger PTR while modal is swiping
+      return;
     }
 
     // PTR
@@ -1804,24 +1800,18 @@ function handleBackdropClick(e, modalId){
 
     // Modal swipe end
     if(mdActive&&mdEl){
-      mdEl.style.transition='transform .22s ease, opacity .22s ease';
+      mdEl.style.transition='transform .22s ease';
       if(dy>MD_THRESHOLD){
-        // Close — animate out then reset styles
         mdEl.style.transform='translateY(105%)';
-        mdEl.style.opacity='0';
         const closingId=mdId;
         const closingEl=mdEl;
         setTimeout(()=>{
           closeM(closingId);
-          // Reset ALL modal content styles to prevent black screen
           closingEl.style.transform='';
-          closingEl.style.opacity='';
           closingEl.style.transition='';
         },220);
       } else {
-        // Snap back
         mdEl.style.transform='';
-        mdEl.style.opacity='';
         setTimeout(()=>{ if(mdEl) mdEl.style.transition=''; },220);
       }
       mdActive=false; mdEl=null; mdId=null;
