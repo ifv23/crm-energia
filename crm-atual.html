@@ -3,6 +3,9 @@
 <head>
 <meta charset="UTF-8"/>
 <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+<meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate"/>
+<meta http-equiv="Pragma" content="no-cache"/>
+<meta http-equiv="Expires" content="0"/>
 <title>EnergiaCRM</title>
 <script src="https://accounts.google.com/gsi/client" async></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js"></script>
@@ -1487,7 +1490,8 @@ async function driveLoad(){
     if(S.chargesHistory[CUR]) S.charges=JSON.parse(JSON.stringify(S.chargesHistory[CUR]));
     const now = new Date().toLocaleTimeString("pt-BR",{hour:"2-digit",minute:"2-digit"});
     driveSetStatus("ok","carregado às "+now);
-    render();
+    if(window._driveLoadDone) window._driveLoadDone();
+    else render();
     toast("✅ Dados carregados do Google Drive!");
   }catch(e){
     driveSetStatus("err","erro ao carregar: "+e.message);
@@ -1539,12 +1543,31 @@ function driveSaveDebounced(){
   if(k){S.apiKey=k;document.getElementById("apib").style.display="none";document.getElementById("api-cfg").value=k;}
   const z=localStorage.getItem("ez");
   if(z){const p=JSON.parse(z);S.zapiInst=p.i;S.zapiTok=p.t;document.getElementById("z-inst").value=p.i;document.getElementById("z-tok").value=p.t;}
-  // Load saved data (tenants, readings, history)
+
+  // Load local state first (for offline fallback)
   loadState();
-  // Set month picker to current working month
+
+  // Set month label
   const lbl = document.getElementById("month-label");
   if(lbl) lbl.textContent = mlbl(CUR);
-  render();
+
+  // If Drive is connected, show loading overlay until Drive data arrives
+  if(savedDriveToken){
+    // Show loading overlay — prevents seeing stale localStorage data
+    const overlay = document.createElement("div");
+    overlay.id = "init-overlay";
+    overlay.style.cssText = "position:fixed;inset:0;background:#0B0D18;z-index:500;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:16px;";
+    overlay.innerHTML = `<div style="width:36px;height:36px;border:3px solid #217346;border-top-color:#2ecc71;border-radius:50%;animation:sp .7s linear infinite;"></div><div style="color:#808080;font-size:13px;">Carregando dados...</div>`;
+    document.body.appendChild(overlay);
+
+    // Remove overlay once Drive loads (or after timeout)
+    const removeOverlay = ()=>{ const o=document.getElementById("init-overlay"); if(o) o.remove(); };
+    // Listen for drive load completion
+    const origRender = window._driveLoadDone = ()=>{ removeOverlay(); render(); };
+    setTimeout(()=>{ removeOverlay(); render(); }, 8000); // max 8s fallback
+  } else {
+    render();
+  }
 })();
 
 async function manualRefresh(){
