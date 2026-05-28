@@ -217,6 +217,7 @@ tr:active td{background:#2a2a2a;}
   </div>
   <div style="margin-left:auto;display:flex;gap:6px;">
     <button id="drive-login-btn" class="btn bg bs2" onclick="driveLogin()" style="font-size:11px;padding:3px 10px;">🔗 Conectar Drive</button>
+    <button id="drive-reconnect-btn" class="btn bg bs2" onclick="driveLogin(false)" style="display:none;font-size:11px;padding:3px 10px;">🔄 Reconectar</button>
     <button id="drive-logout-btn" class="btn bg bs2" onclick="driveLogout()" style="display:none;font-size:11px;padding:3px 10px;">Desconectar</button>
     <button id="drive-refresh-btn" class="btn bg bs2" onclick="manualRefresh()" style="display:none;font-size:11px;padding:3px 10px;">🔄</button>
   </div>
@@ -1327,6 +1328,7 @@ function driveLogin(silent=false){
       localStorage.setItem("gdrive_token", resp.access_token);
       localStorage.setItem("gdrive_expiry", GDRIVE.tokenExpiry);
       document.getElementById("drive-login-btn").style.display="none";
+      document.getElementById("drive-reconnect-btn").style.display="";
       document.getElementById("drive-logout-btn").style.display="";
       if(!silent){
         driveSetStatus("sync","conectando...");
@@ -1385,6 +1387,7 @@ function driveLogout(){
   localStorage.removeItem("gdrive_token");
   localStorage.removeItem("gdrive_fileid");
   document.getElementById("drive-login-btn").style.display="";
+  document.getElementById("drive-reconnect-btn").style.display="none";
   document.getElementById("drive-logout-btn").style.display="none";
   driveSetStatus("","não conectado");
 }
@@ -1514,6 +1517,7 @@ function driveSaveDebounced(){
     GDRIVE.token = savedDriveToken;
     GDRIVE.tokenExpiry = savedExpiry ? Number(savedExpiry) : 0;
     document.getElementById("drive-login-btn").style.display="none";
+    document.getElementById("drive-reconnect-btn").style.display="";
     document.getElementById("drive-logout-btn").style.display="";
     driveSetStatus("sync","reconectando...");
     setTimeout(async()=>{
@@ -1727,96 +1731,122 @@ function confirmBulk(){
   setTimeout(()=>calcAllSilent(),300);
   render();
 }
-(function(){
-  let startY=0, pulling=false, triggered=false;
-  const THRESHOLD = 80;
-
-  document.addEventListener('touchstart', e=>{
-    if(window.scrollY===0) { startY=e.touches[0].clientY; pulling=true; triggered=false; }
-  }, {passive:true});
-
-  document.addEventListener('touchmove', e=>{
-    if(!pulling) return;
-    const dy = e.touches[0].clientY - startY;
-    if(dy < 0){ pulling=false; return; }
-    const progress = Math.min(dy/THRESHOLD, 1);
-    const ind = document.getElementById("ptr-indicator");
-    const spn = document.getElementById("ptr-spinner");
-    const txt = document.getElementById("ptr-text");
-    if(dy > 10){
-      ind.classList.add("visible");
-      spn.style.transform = `rotate(${progress*360}deg)`;
-      if(dy >= THRESHOLD){
-        txt.textContent = "Solte para atualizar";
-        if(!triggered){ triggered=true; }
-      } else {
-        txt.textContent = "Puxe para atualizar";
-      }
-    }
-  }, {passive:true});
-
-  document.addEventListener('touchend', async e=>{
-    if(!pulling) return;
-    pulling=false;
-    const ind = document.getElementById("ptr-indicator");
-    const spn = document.getElementById("ptr-spinner");
-    const txt = document.getElementById("ptr-text");
-    if(triggered){
-      txt.textContent = "Atualizando...";
-      spn.classList.add("spin");
-      // Do the refresh
-      try{
-        if(GDRIVE.token){ await driveLoad(); }
-        else { render(); }
-        txt.textContent = "✅ Atualizado!";
-      }catch(e){ txt.textContent = "Erro ao atualizar"; }
-      setTimeout(()=>{ ind.classList.remove("visible"); spn.classList.remove("spin"); }, 1000);
-    } else {
-      ind.classList.remove("visible");
-    }
-  }, {passive:true});
-})();
-
-// ── MODAL: CLICK OUTSIDE + SWIPE DOWN TO CLOSE ────────────────────────────
+// ── UNIFIED TOUCH HANDLER (PTR + Modal swipe — no conflicts) ──────────────
 function handleBackdropClick(e, modalId){
   if(e.target.classList.contains("mb")) closeM(modalId);
 }
 
 (function(){
-  let modalStartY=0, dragging=false, activeModal=null, modalEl=null;
-  const THRESHOLD=80;
+  // State
+  let startX=0, startY=0;
+  // PTR state
+  let ptrActive=false, ptrTriggered=false;
+  // Modal swipe state
+  let mdActive=false, mdEl=null, mdId=null;
+  const PTR_THRESHOLD=80, MD_THRESHOLD=90;
+
+  function anyModalOpen(){
+    return !!document.querySelector('.mb.on');
+  }
 
   document.addEventListener('touchstart', e=>{
+    startX=e.touches[0].clientX;
+    startY=e.touches[0].clientY;
+
+    // Check if touching modal handle area
     const md=e.target.closest('.md');
     const mb=e.target.closest('.mb');
     if(md&&mb&&mb.classList.contains('on')){
       const rect=md.getBoundingClientRect();
-      if(e.touches[0].clientY - rect.top < 44){
-        modalStartY=e.touches[0].clientY;
-        dragging=true; activeModal=mb.id; modalEl=md;
-        modalEl.style.transition='none';
+      if(startY-rect.top<48){
+        mdActive=true; mdEl=md; mdId=mb.id;
+        mdEl.style.transition='none';
+        return;
       }
+    }
+
+    // PTR: only when no modal open and at top of page
+    if(!anyModalOpen()&&window.scrollY===0){
+      ptrActive=true; ptrTriggered=false;
     }
   },{passive:true});
 
   document.addEventListener('touchmove', e=>{
-    if(!dragging||!modalEl) return;
-    const dy=e.touches[0].clientY-modalStartY;
-    if(dy>0){ modalEl.style.transform=`translateY(${dy}px)`; modalEl.style.opacity=Math.max(0.4,1-dy/250); }
+    const dy=e.touches[0].clientY-startY;
+    const dx=Math.abs(e.touches[0].clientX-startX);
+
+    // Modal swipe
+    if(mdActive&&mdEl){
+      if(dy>0&&dx<dy){ // predominantly vertical downward
+        mdEl.style.transform=`translateY(${dy}px)`;
+        mdEl.style.opacity=String(Math.max(0.3,1-dy/200));
+      }
+      return; // don't trigger PTR while modal is swiping
+    }
+
+    // PTR
+    if(!ptrActive||dy<0) return;
+    if(dx>dy*0.8){ ptrActive=false; return; } // horizontal swipe, ignore
+    const progress=Math.min(dy/PTR_THRESHOLD,1);
+    const ind=document.getElementById("ptr-indicator");
+    const spn=document.getElementById("ptr-spinner");
+    const txt=document.getElementById("ptr-text");
+    if(dy>8){
+      ind.classList.add("visible");
+      spn.style.transform=`rotate(${progress*360}deg)`;
+      txt.textContent=dy>=PTR_THRESHOLD?"Solte para atualizar":"Puxe para atualizar";
+      if(dy>=PTR_THRESHOLD) ptrTriggered=true;
+    }
   },{passive:true});
 
-  document.addEventListener('touchend', e=>{
-    if(!dragging||!modalEl) return;
-    const dy=e.changedTouches[0].clientY-modalStartY;
-    modalEl.style.transition='transform .25s ease, opacity .25s ease';
-    if(dy>THRESHOLD){
-      modalEl.style.transform='translateY(110%)'; modalEl.style.opacity='0';
-      setTimeout(()=>{ closeM(activeModal); modalEl.style.transform=''; modalEl.style.opacity=''; modalEl.style.transition=''; },250);
-    } else {
-      modalEl.style.transform=''; modalEl.style.opacity='';
-      setTimeout(()=>modalEl.style.transition='',250);
+  document.addEventListener('touchend', async e=>{
+    const dy=e.changedTouches[0].clientY-startY;
+
+    // Modal swipe end
+    if(mdActive&&mdEl){
+      mdEl.style.transition='transform .22s ease, opacity .22s ease';
+      if(dy>MD_THRESHOLD){
+        // Close — animate out then reset styles
+        mdEl.style.transform='translateY(105%)';
+        mdEl.style.opacity='0';
+        const closingId=mdId;
+        const closingEl=mdEl;
+        setTimeout(()=>{
+          closeM(closingId);
+          // Reset ALL modal content styles to prevent black screen
+          closingEl.style.transform='';
+          closingEl.style.opacity='';
+          closingEl.style.transition='';
+        },220);
+      } else {
+        // Snap back
+        mdEl.style.transform='';
+        mdEl.style.opacity='';
+        setTimeout(()=>{ if(mdEl) mdEl.style.transition=''; },220);
+      }
+      mdActive=false; mdEl=null; mdId=null;
+      return;
     }
-    dragging=false; modalEl=null; activeModal=null;
+
+    // PTR end
+    if(ptrActive){
+      ptrActive=false;
+      const ind=document.getElementById("ptr-indicator");
+      const spn=document.getElementById("ptr-spinner");
+      const txt=document.getElementById("ptr-text");
+      if(ptrTriggered){
+        txt.textContent="Atualizando...";
+        spn.classList.add("spin");
+        try{
+          if(GDRIVE.token){ await driveLoad(); }
+          else { render(); }
+          txt.textContent="✅ Atualizado!";
+        }catch(err){ txt.textContent="Erro ao atualizar"; }
+        setTimeout(()=>{ ind.classList.remove("visible"); spn.classList.remove("spin"); },1000);
+      } else {
+        ind.classList.remove("visible");
+      }
+    }
   },{passive:true});
 })();
 
