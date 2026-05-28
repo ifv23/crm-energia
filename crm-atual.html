@@ -122,7 +122,7 @@ tr:active td{background:#2a2a2a;}
 .tw{overflow-x:auto;-webkit-overflow-scrolling:touch;}
 
 /* MODAL */
-.mb{display:none;position:fixed;inset:0;background:#000A;z-index:200;align-items:flex-end;justify-content:center;padding:0;overflow-y:auto;}
+.mb{display:none;position:fixed;inset:0;background:#0009;z-index:200;align-items:flex-end;justify-content:center;padding:0;}
 .mb.on{display:flex;}
 .md{
   background:#2d2d2d;border:1px solid #505050;
@@ -557,8 +557,8 @@ function goTab(id,btn){
 }
 
 // ── MODALS ─────────────────────────────────────────────────────────────────
-function openM(id){ document.getElementById(id).classList.add("on"); }
-function closeM(id){ document.getElementById(id).classList.remove("on"); }
+function openM(id){ document.getElementById(id).classList.add("on"); document.body.style.overflow="hidden"; }
+function closeM(id){ document.getElementById(id).classList.remove("on"); document.body.style.overflow=""; }
 function openEDP(editMode=false){
   document.getElementById("edp-err").style.display="none";
   document.getElementById("edp-f").value="";
@@ -1772,17 +1772,20 @@ function handleBackdropClick(e, modalId){
     const dy=e.touches[0].clientY-startY;
     const dx=Math.abs(e.touches[0].clientX-startX);
 
-    // Modal swipe
+    // Modal swipe — prevent ALL page movement
     if(mdActive&&mdEl){
-      if(dy>0&&dx<dy){ // predominantly vertical downward
+      e.preventDefault(); // stops page from scrolling/moving
+      if(dy>0&&dx<dy){
         mdEl.style.transform=`translateY(${dy}px)`;
+      } else if(dy<=0){
+        mdEl.style.transform=''; // don't go up
       }
       return;
     }
 
     // PTR
     if(!ptrActive||dy<0) return;
-    if(dx>dy*0.8){ ptrActive=false; return; } // horizontal swipe, ignore
+    if(dx>dy*0.8){ ptrActive=false; return; }
     const progress=Math.min(dy/PTR_THRESHOLD,1);
     const ind=document.getElementById("ptr-indicator");
     const spn=document.getElementById("ptr-spinner");
@@ -1793,7 +1796,7 @@ function handleBackdropClick(e, modalId){
       txt.textContent=dy>=PTR_THRESHOLD?"Solte para atualizar":"Puxe para atualizar";
       if(dy>=PTR_THRESHOLD) ptrTriggered=true;
     }
-  },{passive:true});
+  },{passive:false}); // passive:false needed to allow preventDefault
 
   document.addEventListener('touchend', async e=>{
     const dy=e.changedTouches[0].clientY-startY;
