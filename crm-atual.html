@@ -131,6 +131,8 @@ tr:active td{background:#2a2a2a;}
   width:100%;max-width:500px;
   max-height:92vh;overflow-y:auto;
   box-shadow:0 -4px 24px #0008;
+  touch-action:pan-y;
+  will-change:transform;
 }
 .md h3{font-size:15px;font-weight:700;color:#fff;margin-bottom:5px;}
 .msub{font-size:12px;color:#808080;margin-bottom:16px;line-height:1.5;}
@@ -246,7 +248,7 @@ tr:active td{background:#2a2a2a;}
 <div id="toast"></div>
 
 <!-- MODAL EDP -->
-<div class="mb" id="modal-edp">
+<div class="mb" onclick="handleBackdropClick(event,'modal-edp')" id="modal-edp">
   <div class="md">
     <h3>📄 Conta EDP</h3>
     <p class="msub">Envie o PDF ou uma foto/print da conta. A IA lê automaticamente os campos <b style="color:#2ecc71">TUSD - Consumo kWh</b> e <b style="color:#2ecc71">TOTAL A PAGAR</b>.</p>
@@ -269,7 +271,7 @@ tr:active td{background:#2a2a2a;}
 </div>
 
 <!-- MODAL MEDIDOR -->
-<div class="mb" id="modal-meter">
+<div class="mb" onclick="handleBackdropClick(event,'modal-meter')" id="modal-meter">
   <div class="md">
     <h3>📷 Medidor</h3>
     <p class="msub" id="meter-sub">Foto do medidor — a IA lê automaticamente.</p>
@@ -400,7 +402,7 @@ tr:active td{background:#2a2a2a;}
 
 
 <!-- MODAL BULK UPLOAD -->
-<div class="mb" id="modal-bulk">
+<div class="mb" onclick="handleBackdropClick(event,'modal-bulk')" id="modal-bulk">
   <div class="md" style="max-width:520px">
     <h3>📤 Upload em massa</h3>
     <p class="msub">Selecione todas as fotos dos medidores de uma vez. A IA identifica automaticamente qual é de qual inquilino pelo número de série e pelo valor do display.</p>
@@ -430,7 +432,7 @@ tr:active td{background:#2a2a2a;}
   </div>
 </div>
 <!-- MODAL EDITAR INQUILINO -->
-<div class="mb" id="modal-edit-tenant">
+<div class="mb" onclick="handleBackdropClick(event,'modal-edit-tenant')" id="modal-edit-tenant">
   <div class="md">
     <h3>✏️ Editar inquilino</h3>
     <p class="msub">Atualize os dados do inquilino.</p>
@@ -446,7 +448,7 @@ tr:active td{background:#2a2a2a;}
   </div>
 </div>
 <!-- MODAL FOTOS -->
-<div class="mb" id="modal-photos">
+<div class="mb" onclick="handleBackdropClick(event,'modal-photos')" id="modal-photos">
   <div class="md" style="max-width:560px">
     <h3 id="photos-title">📷 Fotos do medidor</h3>
     <p class="msub" id="photos-sub"></p>
@@ -882,14 +884,25 @@ async function handleMeter(input){
     const b64 = await fileToB64(file);
     const result = await claude([{role:"user",content:[
       {type:"image",source:{type:"base64",media_type:file.type,data:b64}},
-      {type:"text",text:"Medidor de energia elétrica. Leia o número inteiro do display. Responda SOMENTE JSON: {\"reading\":21760}"}
+      {type:"text",text:"Foto de medidor de energia elétrica. Leia: 1) Valor numérico do display/visor em kWh. 2) Número de série — número impresso abaixo do código de barras (ex: 98647144) ou identificado como S/N na plaquinha. Responda SOMENTE JSON: {\"reading\":6340,\"serial\":\"98647144\"}. Se não ler o serial use null."}
     ]}]);
     // Store photo for history
     meterPhotoB64 = b64;
     meterPhotoType = file.type;
     document.getElementById("meter-v").value=result.reading||"";
     ut.textContent="✅ "+file.name;
-    toast("✅ Leitura: "+result.reading+" kWh");
+    // Auto-save serial to tenant if not yet set
+    if(result.serial && meterTid){
+      const t = S.tenants.find(x=>x.id===meterTid);
+      if(t && !t.serial){
+        t.serial = String(result.serial);
+        toast("✅ "+result.reading+" kWh · S/N "+result.serial+" detectado e salvo!");
+      } else {
+        toast("✅ Leitura: "+result.reading+" kWh");
+      }
+    } else {
+      toast("✅ Leitura: "+result.reading+" kWh");
+    }
   }catch(e){
     ut.textContent="⚠️ Digite manualmente";
     err.textContent="Erro: "+e.message+". Digite o valor manualmente.";
@@ -1589,9 +1602,12 @@ async function handleBulkUpload(input){
       const res = await claude([{role:"user",content:[
         {type:"image",source:{type:"base64",media_type:file.type,data:b64}},
         {type:"text",text:`Foto de medidor de energia elétrica. Extraia:
-1. Valor numérico do display/visor (kWh)
-2. Número de série do medidor (na plaquinha frontal — S/N, Nr Serie, Serial, ou número próximo ao código de barras)
-Responda SOMENTE JSON: {"reading":21760,"serial":"2158408"}
+1. Valor numérico do display/visor em kWh (ex: 6340)
+2. Número de série do medidor — procure especificamente:
+   - O número impresso ABAIXO do código de barras (sequência de 8 dígitos como 98647144)
+   - Ou identificado como S/N, Nr Serie, Serial na plaquinha
+   - Ignore o código de barras em si, quero o número embaixo dele
+Responda SOMENTE JSON: {"reading":6340,"serial":"98647144"}
 Se não conseguir ler algum campo, use null.`}
       ]}]);
 
@@ -1759,6 +1775,49 @@ function confirmBulk(){
       ind.classList.remove("visible");
     }
   }, {passive:true});
+})();
+
+// ── MODAL: CLICK OUTSIDE + SWIPE DOWN TO CLOSE ────────────────────────────
+function handleBackdropClick(e, modalId){
+  if(e.target.classList.contains("mb")) closeM(modalId);
+}
+
+(function(){
+  let modalStartY=0, dragging=false, activeModal=null, modalEl=null;
+  const THRESHOLD=80;
+
+  document.addEventListener('touchstart', e=>{
+    const md=e.target.closest('.md');
+    const mb=e.target.closest('.mb');
+    if(md&&mb&&mb.classList.contains('on')){
+      const rect=md.getBoundingClientRect();
+      if(e.touches[0].clientY - rect.top < 44){
+        modalStartY=e.touches[0].clientY;
+        dragging=true; activeModal=mb.id; modalEl=md;
+        modalEl.style.transition='none';
+      }
+    }
+  },{passive:true});
+
+  document.addEventListener('touchmove', e=>{
+    if(!dragging||!modalEl) return;
+    const dy=e.touches[0].clientY-modalStartY;
+    if(dy>0){ modalEl.style.transform=`translateY(${dy}px)`; modalEl.style.opacity=Math.max(0.4,1-dy/250); }
+  },{passive:true});
+
+  document.addEventListener('touchend', e=>{
+    if(!dragging||!modalEl) return;
+    const dy=e.changedTouches[0].clientY-modalStartY;
+    modalEl.style.transition='transform .25s ease, opacity .25s ease';
+    if(dy>THRESHOLD){
+      modalEl.style.transform='translateY(110%)'; modalEl.style.opacity='0';
+      setTimeout(()=>{ closeM(activeModal); modalEl.style.transform=''; modalEl.style.opacity=''; modalEl.style.transition=''; },250);
+    } else {
+      modalEl.style.transform=''; modalEl.style.opacity='';
+      setTimeout(()=>modalEl.style.transition='',250);
+    }
+    dragging=false; modalEl=null; activeModal=null;
+  },{passive:true});
 })();
 
 </script>
