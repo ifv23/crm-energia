@@ -1315,15 +1315,14 @@ function driveLogin(silent=false){
     prompt: silent ? 'none' : '',  // 'none' = silent refresh, no popup
     callback: async (resp) => {
       if(resp.error){
-        if(silent){
-          // Silent failed — need user interaction, show reconnect button
-          driveSetStatus("err","sessão expirada — clique em Reconectar");
-          document.getElementById("drive-login-btn").style.display="";
-          document.getElementById("drive-login-btn").textContent="🔄 Reconectar Drive";
-          document.getElementById("drive-logout-btn").style.display="none";
-        } else {
-          driveSetStatus("err","erro ao conectar");
-        }
+        // Silent failed — need user interaction
+        // Remove loading overlay first so user can tap reconnect button
+        const o=document.getElementById("init-overlay"); if(o) o.remove();
+        render();
+        driveSetStatus("err","toque em Reconectar para continuar");
+        document.getElementById("drive-reconnect-btn").style.display="";
+        document.getElementById("drive-login-btn").style.display="none";
+        if(!silent) driveSetStatus("err","erro ao conectar");
         return;
       }
       GDRIVE.token = resp.access_token;
@@ -1356,9 +1355,11 @@ function driveRefreshOrLogin(){
     prompt: 'none',
     callback: async (resp) => {
       if(resp.error){
-        // Silent failed — do visible login automatically (no user click needed)
-        driveSetStatus("sync","abrindo login...");
-        setTimeout(()=> driveLogin(false), 300);
+        // Silent failed — remove overlay and show reconnect button for user to tap
+        const o=document.getElementById("init-overlay"); if(o) o.remove();
+        render();
+        driveSetStatus("err","toque em Reconectar para continuar");
+        document.getElementById("drive-reconnect-btn").style.display="";
         return;
       }
       // Silent succeeded
@@ -1553,18 +1554,33 @@ function driveSaveDebounced(){
 
   // If Drive is connected, show loading overlay until Drive data arrives
   if(savedDriveToken){
-    // Show loading overlay — prevents seeing stale localStorage data
     const overlay = document.createElement("div");
     overlay.id = "init-overlay";
     overlay.style.cssText = "position:fixed;inset:0;background:#0B0D18;z-index:500;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:16px;";
-    overlay.innerHTML = `<div style="width:36px;height:36px;border:3px solid #217346;border-top-color:#2ecc71;border-radius:50%;animation:sp .7s linear infinite;"></div><div style="color:#808080;font-size:13px;">Carregando dados...</div>`;
+    overlay.innerHTML = `
+      <div style="width:36px;height:36px;border:3px solid #217346;border-top-color:#2ecc71;border-radius:50%;animation:sp .7s linear infinite;"></div>
+      <div id="overlay-msg" style="color:#808080;font-size:13px;">Conectando ao Drive...</div>
+      <button onclick="document.getElementById('init-overlay').remove();render();" style="margin-top:8px;background:transparent;border:1px solid #404040;color:#808080;padding:8px 16px;border-radius:4px;cursor:pointer;font-size:12px;">Continuar sem Drive</button>
+    `;
     document.body.appendChild(overlay);
 
-    // Remove overlay once Drive loads (or after timeout)
     const removeOverlay = ()=>{ const o=document.getElementById("init-overlay"); if(o) o.remove(); };
-    // Listen for drive load completion
-    const origRender = window._driveLoadDone = ()=>{ removeOverlay(); render(); };
-    setTimeout(()=>{ removeOverlay(); render(); }, 8000); // max 8s fallback
+    window._driveLoadDone = ()=>{ removeOverlay(); render(); };
+
+    // Update overlay message based on drive status
+    const statusObserver = setInterval(()=>{
+      const msg = document.getElementById("overlay-msg");
+      const driveMsg = document.getElementById("drive-msg");
+      if(msg && driveMsg) msg.textContent = driveMsg.textContent;
+      // If drive loaded successfully, remove overlay
+      if(driveMsg && driveMsg.textContent.includes("carregado")){
+        clearInterval(statusObserver);
+        removeOverlay();
+      }
+    }, 300);
+
+    // Max 20s fallback
+    setTimeout(()=>{ clearInterval(statusObserver); removeOverlay(); render(); }, 20000);
   } else {
     render();
   }
