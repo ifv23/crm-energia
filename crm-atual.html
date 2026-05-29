@@ -364,8 +364,9 @@ tr:active td{background:#2a2a2a;}
       <div><div class="fl">Nome</div><input type="text" id="n-name" placeholder="Nome completo"/></div>
       <div><div class="fl">Unidade</div><input type="text" id="n-unit" placeholder="Apt 301"/></div>
     </div>
-    <div style="margin-bottom:14px"><div class="fl">WhatsApp (55+DDD+número)</div><input type="text" id="n-phone" placeholder="5511987654321"/></div>
-    <button class="btn bp" onclick="addTenant()">Adicionar</button>
+    <div style="margin-bottom:10px"><div class="fl">WhatsApp (55+DDD+número)</div><input type="text" id="n-phone" placeholder="5511987654321"/></div>
+    <div style="margin-bottom:14px"><div class="fl">Nº de série do medidor (opcional)</div><input type="text" id="n-serial" placeholder="Ex: 98647144"/></div>
+    <button class="btn bp btn-full" onclick="addTenant()">Adicionar inquilino</button>
   </div>
   <div class="card"><div class="ct">👥 Cadastrados</div><div class="tw"><table><thead><tr><th>Nome</th><th>WhatsApp</th><th>Status</th><th>Ações</th></tr></thead><tbody id="ten-tb"></tbody></table></div></div>
 </div>
@@ -390,6 +391,28 @@ tr:active td{background:#2a2a2a;}
       <div><div class="fl">Token</div><input type="password" id="z-tok" placeholder="Token Z-API"/></div>
     </div>
     <button class="btn bp" onclick="saveZapi()">Salvar</button>
+  </div>
+
+  <div class="card">
+    <div class="ct">🚀 Publicar no GitHub</div>
+    <div class="ib" style="margin-bottom:14px;">
+      <b style="color:#2ecc71">Como obter o token:</b><br>
+      1. Acesse <a href="https://github.com/settings/tokens" target="_blank" style="color:#2ecc71">github.com/settings/tokens</a><br>
+      2. Clique em <b>Generate new token (classic)</b><br>
+      3. Nome: <b>EnergiaCRM</b> · Marque apenas: <b>repo</b><br>
+      4. Clique Generate → copie e cole abaixo
+    </div>
+    <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-bottom:10px;">
+      <div><div class="fl">Usuário GitHub</div><input type="text" id="gh-user" placeholder="Ex: ifv23"/></div>
+      <div><div class="fl">Repositório</div><input type="text" id="gh-repo" placeholder="Ex: crm-energia"/></div>
+    </div>
+    <div style="margin-bottom:10px"><div class="fl">Nome do arquivo</div><input type="text" id="gh-file" placeholder="Ex: crm-atual.html"/></div>
+    <div style="margin-bottom:14px"><div class="fl">Personal Access Token</div><input type="password" id="gh-token" placeholder="ghp_..."/></div>
+    <div style="display:flex;gap:8px;flex-wrap:wrap;">
+      <button class="btn bp" style="flex:1;justify-content:center;" onclick="saveGHConfig()">💾 Salvar config</button>
+      <button class="btn bg2" style="flex:1;justify-content:center;" id="gh-publish-btn" onclick="publishToGitHub()">🚀 Publicar agora</button>
+    </div>
+    <div id="gh-status" style="margin-top:10px;font-size:12px;color:#808080;display:none;"></div>
   </div>
 </div>
 
@@ -1034,11 +1057,15 @@ function addTenant(){
   const name=document.getElementById("n-name").value.trim();
   const unit=document.getElementById("n-unit").value.trim();
   const phone=document.getElementById("n-phone").value.trim();
-  const serial=document.getElementById("n-serial").value.trim();
+  const serialEl=document.getElementById("n-serial");
+  const serial=serialEl?serialEl.value.trim():"";
   if(!name||!unit||!phone){toast("Preencha todos os campos.",true);return;}
   S.tenants.push({id:Date.now(),name,unit,phone,serial,active:true});
-  document.getElementById("n-name").value="";document.getElementById("n-unit").value="";document.getElementById("n-phone").value="";document.getElementById("n-serial").value="";
-  saveState(); toast(`✅ ${name} adicionado!`); render();
+  document.getElementById("n-name").value="";
+  document.getElementById("n-unit").value="";
+  document.getElementById("n-phone").value="";
+  if(serialEl) serialEl.value="";
+  saveState(); toast("✅ "+name+" adicionado!"); render();
 }
 
 // ── PHOTOS MODAL ───────────────────────────────────────────────────────────
@@ -1491,8 +1518,7 @@ async function driveLoad(){
     if(S.chargesHistory[CUR]) S.charges=JSON.parse(JSON.stringify(S.chargesHistory[CUR]));
     const now = new Date().toLocaleTimeString("pt-BR",{hour:"2-digit",minute:"2-digit"});
     driveSetStatus("ok","carregado às "+now);
-    if(window._driveLoadDone) window._driveLoadDone();
-    else render();
+    render();
     toast("✅ Dados carregados do Google Drive!");
   }catch(e){
     driveSetStatus("err","erro ao carregar: "+e.message);
@@ -1545,6 +1571,15 @@ function driveSaveDebounced(){
   const z=localStorage.getItem("ez");
   if(z){const p=JSON.parse(z);S.zapiInst=p.i;S.zapiTok=p.t;document.getElementById("z-inst").value=p.i;document.getElementById("z-tok").value=p.t;}
 
+  // Load GH config
+  const ghSaved=localStorage.getItem("energiacrm_gh");
+  if(ghSaved){try{const p=JSON.parse(ghSaved);GH.user=p.u;GH.repo=p.r;GH.file=p.f;GH.token=p.t;
+    document.getElementById("gh-user").value=p.u||"";
+    document.getElementById("gh-repo").value=p.r||"";
+    document.getElementById("gh-file").value=p.f||"";
+    document.getElementById("gh-token").value=p.t||"";
+  }catch(e){}}
+
   // Load local state first (for offline fallback)
   loadState();
 
@@ -1552,37 +1587,13 @@ function driveSaveDebounced(){
   const lbl = document.getElementById("month-label");
   if(lbl) lbl.textContent = mlbl(CUR);
 
-  // If Drive is connected, show loading overlay until Drive data arrives
-  if(savedDriveToken){
-    const overlay = document.createElement("div");
-    overlay.id = "init-overlay";
-    overlay.style.cssText = "position:fixed;inset:0;background:#0B0D18;z-index:500;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:16px;";
-    overlay.innerHTML = `
-      <div style="width:36px;height:36px;border:3px solid #217346;border-top-color:#2ecc71;border-radius:50%;animation:sp .7s linear infinite;"></div>
-      <div id="overlay-msg" style="color:#808080;font-size:13px;">Conectando ao Drive...</div>
-      <button onclick="document.getElementById('init-overlay').remove();render();" style="margin-top:8px;background:transparent;border:1px solid #404040;color:#808080;padding:8px 16px;border-radius:4px;cursor:pointer;font-size:12px;">Continuar sem Drive</button>
-    `;
-    document.body.appendChild(overlay);
-
-    const removeOverlay = ()=>{ const o=document.getElementById("init-overlay"); if(o) o.remove(); };
-    window._driveLoadDone = ()=>{ removeOverlay(); render(); };
-
-    // Update overlay message based on drive status
-    const statusObserver = setInterval(()=>{
-      const msg = document.getElementById("overlay-msg");
-      const driveMsg = document.getElementById("drive-msg");
-      if(msg && driveMsg) msg.textContent = driveMsg.textContent;
-      // If drive loaded successfully, remove overlay
-      if(driveMsg && driveMsg.textContent.includes("carregado")){
-        clearInterval(statusObserver);
-        removeOverlay();
-      }
-    }, 300);
-
-    // Max 20s fallback
-    setTimeout(()=>{ clearInterval(statusObserver); removeOverlay(); render(); }, 20000);
-  } else {
-    render();
+  // Render immediately with local data — Drive loads in background
+  render();
+  // If Drive token expired or missing, highlight reconnect button
+  if(!savedDriveToken){
+    // Not connected — show connect banner prominently
+    const bar = document.getElementById("drive-bar");
+    if(bar) bar.style.background="#1e2a1e";
   }
 })();
 
@@ -1770,6 +1781,68 @@ function confirmBulk(){
   setTimeout(()=>calcAllSilent(),300);
   render();
 }
+// ── GITHUB AUTO-PUBLISH ────────────────────────────────────────────────────
+const GH = { user:"", repo:"", file:"", token:"" };
+
+function saveGHConfig(){
+  GH.user  = document.getElementById("gh-user").value.trim();
+  GH.repo  = document.getElementById("gh-repo").value.trim();
+  GH.file  = document.getElementById("gh-file").value.trim();
+  GH.token = document.getElementById("gh-token").value.trim();
+  if(!GH.user||!GH.repo||!GH.file||!GH.token){ toast("Preencha todos os campos do GitHub.",true); return; }
+  localStorage.setItem("energiacrm_gh", JSON.stringify({u:GH.user,r:GH.repo,f:GH.file,t:GH.token}));
+  toast("✅ Config GitHub salva!");
+}
+
+async function publishToGitHub(){
+  const btn = document.getElementById("gh-publish-btn");
+  const status = document.getElementById("gh-status");
+  const saved = localStorage.getItem("energiacrm_gh");
+  if(saved){ try{ const p=JSON.parse(saved); GH.user=p.u; GH.repo=p.r; GH.file=p.f; GH.token=p.t; }catch(e){} }
+  if(!GH.user||!GH.repo||!GH.file||!GH.token){ toast("Configure o GitHub em ⚙️ Config primeiro.",true); return; }
+
+  btn.disabled=true; btn.textContent="⏳ Publicando...";
+  status.style.display="block"; status.style.color="#f0a500";
+  status.textContent="Buscando versão atual do GitHub...";
+  try{
+    // Get SHA
+    const getRes = await fetch(
+      `https://api.github.com/repos/${GH.user}/${GH.repo}/contents/${GH.file}`,
+      { headers:{"Authorization":"token "+GH.token,"Accept":"application/vnd.github.v3+json"} }
+    );
+    let sha="";
+    if(getRes.ok){ const d=await getRes.json(); sha=d.sha; }
+
+    status.textContent="Preparando e enviando...";
+    const htmlContent = document.documentElement.outerHTML;
+    const b64 = btoa(unescape(encodeURIComponent(htmlContent)));
+
+    const pushRes = await fetch(
+      `https://api.github.com/repos/${GH.user}/${GH.repo}/contents/${GH.file}`,
+      {
+        method:"PUT",
+        headers:{"Authorization":"token "+GH.token,"Accept":"application/vnd.github.v3+json","Content-Type":"application/json"},
+        body:JSON.stringify({ message:"EnergiaCRM update "+new Date().toLocaleString("pt-BR"), content:b64, sha })
+      }
+    );
+    if(pushRes.ok){
+      status.style.color="#2ecc71";
+      status.textContent="✅ Publicado! Disponível em ~1 minuto.";
+      toast("✅ Publicado no GitHub!");
+    } else {
+      const err=await pushRes.json();
+      status.style.color="#e74c3c";
+      status.textContent="❌ "+(err.message||pushRes.status);
+      toast("Erro: "+(err.message||pushRes.status),true);
+    }
+  }catch(e){
+    status.style.color="#e74c3c";
+    status.textContent="❌ "+e.message;
+    toast("Erro: "+e.message,true);
+  }
+  btn.disabled=false; btn.textContent="🚀 Publicar agora";
+}
+
 // ── UNIFIED TOUCH HANDLER (PTR + Modal swipe — no conflicts) ──────────────
 function handleBackdropClick(e, modalId){
   if(e.target.classList.contains("mb")) closeM(modalId);
