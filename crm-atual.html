@@ -1318,7 +1318,7 @@ function render(){
 
 // ── GOOGLE DRIVE ──────────────────────────────────────────────────────────
 const GDRIVE = {
-  CLIENT_ID: "598901024458-029lcc7ciff0tuk1m04jf2ehgntfevj2.apps.googleusercontent.com",
+  CLIENT_ID: "373007019559-tjh5rkcb86oju1macfss76t8lniromsr.apps.googleusercontent.com",
   SCOPES: "https://www.googleapis.com/auth/drive.file",
   FILE_NAME: "energia-crm-backup.json",
   fileId: null,
@@ -1629,14 +1629,7 @@ function driveSaveDebounced(){
     document.getElementById("gh-repo").value=p.r||"";
     document.getElementById("gh-file").value=p.f||"";
     document.getElementById("gh-token").value=p.t||"";
-  }catch(e){}}else{
-    // Pre-filled defaults
-    GH.user="ifv23"; GH.repo="crm-energia"; GH.file="crm-atual.html"; GH.token="SEU_TOKEN_AQUI";
-    document.getElementById("gh-user").value="ifv23";
-    document.getElementById("gh-repo").value="crm-energia";
-    document.getElementById("gh-file").value="crm-atual.html";
-    document.getElementById("gh-token").value="SEU_TOKEN_AQUI";
-  }
+  }catch(e){}}
 
   // Load local state first (for offline fallback)
   loadState();
