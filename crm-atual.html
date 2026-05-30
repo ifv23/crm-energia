@@ -1531,49 +1531,67 @@ async function driveLoad(){
 async function checkEDPPendente(){
   if(!GDRIVE.token) return;
   try{
-    // Search for edp-pendente.json in Drive
     const res = await driveFetch(
       "https://www.googleapis.com/drive/v3/files?q=name='edp-pendente.json'+and+trashed=false&fields=files(id,name)"
     );
     if(!res) return;
     const data = await res.json();
-    if(!data.files || data.files.length===0) return;
+    if(!data.files||data.files.length===0) return;
 
     const fileId = data.files[0].id;
-    const fileRes = await driveFetch(
-      `https://www.googleapis.com/drive/v3/files/${fileId}?alt=media`
-    );
+    const fileRes = await driveFetch(`https://www.googleapis.com/drive/v3/files/${fileId}?alt=media`);
     if(!fileRes) return;
     const pendente = await fileRes.json();
-    if(!pendente || (!pendente.kwh && !pendente.total_brl)) return;
+    if(!pendente||!pendente.pdfDriveId) return;
 
-    // Got pending EDP data!
-    Logger.log && Logger.log("EDP pendente encontrado:", pendente);
+    const msg = `📧 Conta EDP recebida por email!
 
-    // Show notification to user
-    const msg = pendente.kwh && pendente.total_brl
-      ? `📧 Conta EDP detectada no email!\n${pendente.kwh} kWh · ${fmt(pendente.total_brl)}\nMês: ${pendente.mes ? mlbl(pendente.mes) : "?"}\n\nDeseja importar agora?`
-      : `📧 PDF da EDP recebido por email (${pendente.pdfNome||"conta.pdf"}).\nValores não detectados automaticamente.\n\nDeseja abrir para conferir?`;
+Arquivo: ${pendente.pdfNome||"conta.pdf"}
 
-    if(confirm(msg)){
-      if(pendente.kwh && pendente.total_brl){
-        S.edp = {kwh:pendente.kwh, total_brl:pendente.total_brl, costPerKwh:pendente.total_brl/pendente.kwh};
-        if(pendente.mes) CUR = pendente.mes;
-        S.edpHistory[CUR] = {...S.edp};
-        saveState();
-        render();
-        toast("✅ Conta EDP importada do email!");
-        calcAllSilent();
+Deseja ler com IA agora?`;
+    if(!confirm(msg)) return;
+
+    // Baixa o PDF do Drive
+    driveSetStatus("sync","Baixando PDF...");
+    const pdfRes = await driveFetch(`https://www.googleapis.com/drive/v3/files/${pendente.pdfDriveId}?alt=media`);
+    if(!pdfRes){ toast("Erro ao baixar PDF.",true); driveSetStatus("ok","pronto"); return; }
+
+    const pdfBlob = await pdfRes.blob();
+    const pdfFile = new File([pdfBlob], pendente.pdfNome||"edp.pdf", {type:"application/pdf"});
+
+    // Tenta extração de texto primeiro
+    toast("⏳ Lendo PDF...");
+    const pdfText = await extractPDFText(pdfFile);
+    const {kwh, brl} = parseEDPFromText(pdfText);
+
+    if(kwh && brl){
+      S.edp={kwh,total_brl:brl,costPerKwh:brl/kwh};
+      S.edpHistory[CUR]={...S.edp};
+      saveState(); render(); calcAllSilent();
+      toast("✅ "+kwh+" kWh · "+fmt(brl));
+    } else {
+      // Fallback: imagem via Claude
+      toast("⏳ Analisando com IA...");
+      const b64 = await pdfToBase64Image(pdfFile);
+      const result = await claude([{role:"user",content:[
+        {type:"image",source:{type:"base64",media_type:"image/jpeg",data:b64}},
+        {type:"text",text:"Conta de energia EDP Brasil. Extraia: 1) kWh consumidos: número na coluna Quantidade da linha TUSD - Consumo kWh (ex: 1207). 2) Total a pagar: campo TOTAL A PAGAR (ex: 1310.43). Responda SOMENTE JSON: {\"kwh\":1207,\"total_brl\":1310.43}"}
+      ]}]);
+      if(result.kwh&&result.total_brl){
+        S.edp={kwh:result.kwh,total_brl:result.total_brl,costPerKwh:result.total_brl/result.kwh};
+        S.edpHistory[CUR]={...S.edp};
+        saveState(); render(); calcAllSilent();
+        toast("✅ "+result.kwh+" kWh · "+fmt(result.total_brl));
+      } else {
+        toast("⚠️ Não consegui ler os valores. Tente o upload manual.",true);
       }
-      // Delete the pending file
-      await driveFetch(
-        `https://www.googleapis.com/drive/v3/files/${fileId}`,
-        {method:"DELETE"}
-      );
     }
-  }catch(e){
-    console.error("checkEDPPendente error:", e);
-  }
+
+    // Apaga pendente
+    await driveFetch(`https://www.googleapis.com/drive/v3/files/${fileId}`,{method:"DELETE"});
+    driveSetStatus("ok","pronto");
+
+  }catch(e){ console.error("checkEDPPendente:",e); driveSetStatus("ok","pronto"); }
 }
 
 // Debounced auto-save — waits 1.5s after last action
