@@ -223,6 +223,7 @@ tr:active td{background:#2a2a2a;}
     <button id="drive-reconnect-btn" class="btn bg bs2" onclick="driveLogin(false)" style="display:none;font-size:11px;padding:3px 10px;">🔄 Reconectar</button>
     <button id="drive-logout-btn" class="btn bg bs2" onclick="driveLogout()" style="display:none;font-size:11px;padding:3px 10px;">Desconectar</button>
     <button id="drive-refresh-btn" class="btn bg bs2" onclick="manualRefresh()" style="display:none;font-size:11px;padding:3px 10px;">🔄</button>
+    <button id="drive-check-edp-btn" class="btn bg bs2" onclick="checkEDPPendente()" style="display:none;font-size:11px;padding:3px 10px;background:#1e3a1e;color:#4caf50;border-color:#2d4a2d;">📧 Ver conta EDP</button>
   </div>
 </div>
 
@@ -1537,6 +1538,10 @@ async function checkEDPPendente(){
     if(!res) return;
     const data = await res.json();
     if(!data.files||data.files.length===0) return;
+
+    // Found pending file — show button in drive bar
+    const checkBtn = document.getElementById("drive-check-edp-btn");
+    if(checkBtn) checkBtn.style.display="";
 
     const fileId = data.files[0].id;
     const fileRes = await driveFetch(`https://www.googleapis.com/drive/v3/files/${fileId}?alt=media`);
