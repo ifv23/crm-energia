@@ -1326,7 +1326,7 @@ function render(){
 // ── GOOGLE DRIVE ──────────────────────────────────────────────────────────
 const GDRIVE = {
   CLIENT_ID: "373007019559-tjh5rkcb86oju1macfss76t8lniromsr.apps.googleusercontent.com",
-  SCOPES: "https://www.googleapis.com/auth/drive.file",
+  SCOPES: "https://www.googleapis.com/auth/drive",
   FILE_NAME: "energia-crm-backup.json",
   fileId: null,
   token: null,
@@ -1550,11 +1550,16 @@ async function checkEDPPendente(){
     if(!confirm(msg)) return;
 
     driveSetStatus("sync","Baixando PDF...");
-    // Use public URL — no OAuth scope needed
-    const downloadUrl = pendente.pdfPublicUrl ||
-      `https://drive.google.com/uc?export=download&id=${pendente.pdfDriveId}`;
-    const pdfRes = await fetch(downloadUrl);
-    if(!pdfRes||!pdfRes.ok){ toast("Erro ao baixar PDF.",true); driveSetStatus("ok","pronto"); return; }
+    // Download via Drive API with auth token (file is in same account)
+    const pdfRes = await fetch(
+      `https://www.googleapis.com/drive/v3/files/${pendente.pdfDriveId}?alt=media&supportsAllDrives=true`,
+      { headers:{"Authorization":"Bearer "+GDRIVE.token} }
+    );
+    if(!pdfRes||!pdfRes.ok){
+      console.error("PDF download status:", pdfRes?.status);
+      toast("Erro ao baixar PDF ("+pdfRes?.status+").",true);
+      driveSetStatus("ok","pronto"); return;
+    }
 
     const pdfArrayBuffer = await pdfRes.arrayBuffer();
     const pdfBlob = new Blob([pdfArrayBuffer], {type:"application/pdf"});
