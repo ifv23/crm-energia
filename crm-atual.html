@@ -770,27 +770,22 @@ function parseEDPFromText(text){
   return {kwh, brl};
 }
 
-async function pdfToBase64Image(file, fullPage=false){
+async function pdfToBase64Image(file){
   const buf = await file.arrayBuffer();
   const pdf = await pdfjsLib.getDocument({data:buf}).promise;
   const page = await pdf.getPage(1);
-  // High scale for preview quality
-  const scale = fullPage ? 1.5 : 3.0;
-  const vp = page.getViewport({scale});
+  // iOS canvas max ~16MP — use scale 2.5 which stays safe
+  const vp = page.getViewport({scale:2.5});
   const canvas = document.createElement("canvas");
   canvas.width = vp.width;
-  // For preview: only render top 45% of page (where TUSD + Total appear)
-  canvas.height = fullPage ? vp.height : Math.floor(vp.height * 0.45);
+  // Crop to top 45% — shows TUSD + Total A Pagar clearly
+  canvas.height = Math.floor(vp.height * 0.45);
   const ctx = canvas.getContext("2d");
   ctx.fillStyle = "#fff";
   ctx.fillRect(0,0,canvas.width,canvas.height);
   await page.render({canvasContext:ctx, viewport:vp}).promise;
+  console.log("Preview canvas:", canvas.width+"x"+canvas.height);
   return canvas.toDataURL("image/jpeg",0.85).split(",")[1];
-}
-
-async function pdfToBase64Full(file){
-  // Full page at normal scale for sharing
-  return pdfToBase64Image(file, true);
 }
 
 async function handleEDP(input){
@@ -1578,6 +1573,8 @@ async function driveLoad(){
     if(S.chargesHistory[CUR]) S.charges=JSON.parse(JSON.stringify(S.chargesHistory[CUR]));
     const now = new Date().toLocaleTimeString("pt-BR",{hour:"2-digit",minute:"2-digit"});
     driveSetStatus("ok","carregado às "+now);
+    // Sync to localStorage so offline fallback is up to date
+    saveState();
     render();
     toast("✅ Dados carregados do Google Drive!");
     setTimeout(checkEDPPendente, 1000);
@@ -1622,9 +1619,11 @@ async function checkEDPPendente(){
 
     if(kwh && brl){
       S.edp={kwh,total_brl:brl,costPerKwh:brl/kwh};
-      // Generate preview image for the modal
-      try{ const pb64=await pdfToBase64Image(pdfFile); S.edpHistory[CUR]={...S.edp,previewB64:pb64,previewMime:"image/jpeg"}; }
-      catch(_){ S.edpHistory[CUR]={...S.edp}; }
+      try{
+        const pb64=await pdfToBase64Image(pdfFile);
+        const pdfFull=await fileToB64(pdfFile);
+        S.edpHistory[CUR]={...S.edp,previewB64:pb64,previewMime:"image/jpeg",pdfB64:pdfFull};
+      }catch(e){ console.error("preview error:",e); S.edpHistory[CUR]={...S.edp}; }
       S.edpPendente=null;
       saveState(); render(); calcAllSilent();
       toast("✅ "+kwh+" kWh · "+fmt(brl));
@@ -1707,18 +1706,19 @@ function driveSaveDebounced(){
     document.getElementById("gh-token").value=p.t||"";
   }catch(e){}}
 
-  // Load local state first (for offline fallback)
-  loadState();
+  // Load local state only if Drive is NOT connected (offline fallback)
+  // If Drive is connected, skip localStorage and wait for Drive data
+  if(!savedDriveToken){
+    loadState();
+  }
 
   // Set month label
   const lbl = document.getElementById("month-label");
   if(lbl) lbl.textContent = mlbl(CUR);
 
-  // Render immediately with local data — Drive loads in background
+  // Render immediately — if Drive connected, shows empty state briefly until Drive loads
   render();
-  // If Drive token expired or missing, highlight reconnect button
   if(!savedDriveToken){
-    // Not connected — show connect banner prominently
     const bar = document.getElementById("drive-bar");
     if(bar) bar.style.background="#1e2a1e";
   }
