@@ -1550,10 +1550,10 @@ async function checkEDPPendente(){
     if(!confirm(msg)) return;
 
     driveSetStatus("sync","Baixando PDF...");
-    // Use direct fetch with responseType blob for binary PDF
-    const pdfRes = await fetch("https://www.googleapis.com/drive/v3/files/"+pendente.pdfDriveId+"?alt=media", {
-      headers:{"Authorization":"Bearer "+GDRIVE.token}
-    });
+    // Use public URL — no OAuth scope needed
+    const downloadUrl = pendente.pdfPublicUrl ||
+      `https://drive.google.com/uc?export=download&id=${pendente.pdfDriveId}`;
+    const pdfRes = await fetch(downloadUrl);
     if(!pdfRes||!pdfRes.ok){ toast("Erro ao baixar PDF.",true); driveSetStatus("ok","pronto"); return; }
 
     const pdfArrayBuffer = await pdfRes.arrayBuffer();
