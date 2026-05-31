@@ -1520,6 +1520,8 @@ async function driveLoad(){
     if(data.edpHistory) S.edpHistory=data.edpHistory;
     if(data.chargesHistory) S.chargesHistory=data.chargesHistory;
     if(data.photoHistory) S.photoHistory=data.photoHistory;
+    // Preserve edpPendente from Drive (set by Apps Script)
+    if(data.edpPendente) S.edpPendente=data.edpPendente;
     // Restore current month
     if(S.edpHistory[CUR]) S.edp=S.edpHistory[CUR];
     if(S.chargesHistory[CUR]) S.charges=JSON.parse(JSON.stringify(S.chargesHistory[CUR]));
