@@ -349,11 +349,6 @@ tr:active td{background:#2a2a2a;}
 <div class="pg" id="pg-charges">
   <div id="ch-empty" style="display:none"><div class="card" style="text-align:center;padding:48px"><div style="font-size:48px;margin-bottom:12px">💡</div><div style="color:#808080;margin-bottom:20px">Nenhuma cobrança calculada.</div><button class="btn bp" onclick="calcAll()">Calcular agora</button></div></div>
   <div id="ch-content" style="display:none">
-    <div style="display:flex;gap:10px;margin-bottom:14px;flex-wrap:wrap;">
-      <button class="btn bp" onclick="approveAll()">✅ Aprovar todas</button>
-      <button class="btn bg" onclick="calcAll()">🔄 Recalcular</button>
-      <button class="btn bg2" onclick="sendAll()">📲 Enviar aprovadas</button>
-    </div>
     <div id="ch-list"></div>
   </div>
 </div>
@@ -1318,30 +1313,23 @@ function render(){
   if(hasC){
     document.getElementById("ch-list").innerHTML=active.filter(t=>S.charges[t.id]).map(t=>{
       const c=S.charges[t.id];
-      const bc=c.status==="sent"?"#2ecc71":c.status==="approved"?"#217346":"#404040";
-      const stMap2={calculated:"bc Calculado",approved:"ba Aprovado",sent:"bs0 Enviado"};
-      const st=stMap2[c.status].split(" ");
-      const btn=c.status==="calculated"
-        ?`<button class="btn bp" onclick="S.charges[${t.id}].status='approved';render()">✅ Aprovar</button>`
-        :c.status==="approved"
-        ?`<button class="btn bg2" onclick="sendWA(${t.id})">📲 WhatsApp</button>`
-        :`<span style="color:#2ecc71;font-size:13px;font-weight:700">✔ Enviado</span>`;
-      return `<div class="card" style="margin-bottom:12px;border-left:3px solid ${bc}">
-        <div style="display:flex;justify-content:space-between;align-items:flex-start;flex-wrap:wrap;gap:14px">
-          <div style="flex:1">
-            <div style="display:flex;align-items:center;gap:10px;margin-bottom:6px;flex-wrap:wrap">
+      const prev=getRd(t.id,PREV), cur=getRd(t.id,CUR);
+      const msg=`Olá *${t.name}*! 👋\n\nSegue o resumo do seu consumo de energia referente a *${mlbl(CUR)}*:\n\n⚡ Leitura anterior: ${prev} kWh\n⚡ Leitura atual: ${cur} kWh\n📊 Consumo do mês: ${c.diff} kWh\n\n💡 Custo por kWh este mês: R$ ${S.edp?S.edp.costPerKwh.toFixed(4):"—"}\n💰 *Total a pagar: ${fmt(c.amount)}*\n\nEm caso de dúvidas, estou à disposição. Obrigado! 🙏`;
+      return `<div class="card" style="margin-bottom:12px;border-left:3px solid #217346">
+        <div style="display:flex;justify-content:space-between;align-items:flex-start;gap:10px;flex-wrap:wrap">
+          <div style="flex:1;min-width:0">
+            <div style="display:flex;align-items:center;gap:8px;margin-bottom:8px;flex-wrap:wrap">
               <span style="font-weight:700;font-size:14px;color:#fff">${t.name}</span>
-              <span style="color:#808080;font-size:13px">· ${t.unit}</span>
-              <span class="badge ${st[0]}">${st[1]}</span>
+              <span style="color:#808080;font-size:12px">· ${t.unit}</span>
             </div>
-            <div style="font-size:13px;color:#9EA3BF;margin-bottom:10px">⚡ ${c.diff} kWh consumidos</div>
-            <div style="background:#252525;border-radius:2px;padding:10px 12px;font-size:12px;color:#999;line-height:1.6">
-              Mensagem: Olá ${t.name}! Consumo de ${mlbl(CUR)}: ${c.diff} kWh = <b style="color:#2ecc71">${fmt(c.amount)}</b>
-            </div>
+            <div style="background:#1a1a1a;border-radius:3px;padding:10px 12px;font-size:12px;color:#b0b0b0;line-height:1.8;white-space:pre-line">${msg}</div>
           </div>
-          <div style="display:flex;flex-direction:column;align-items:flex-end;gap:10px">
-            <div style="font-family:'Syne',sans-serif;font-size:28px;font-weight:800;color:#2ecc71">${fmt(c.amount)}</div>
-            ${btn}
+          <div style="display:flex;flex-direction:column;align-items:flex-end;gap:8px;flex-shrink:0">
+            <div style="font-size:22px;font-weight:700;color:#2ecc71">${fmt(c.amount)}</div>
+            <button class="btn bg bs2" onclick="navigator.clipboard.writeText(\`${msg.replace(/`/g,'\\`')}\`).then(()=>toast('✅ Copiado!'))" title="Copiar mensagem">
+              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="9" y="9" width="13" height="13" rx="2"/><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/></svg>
+              Copiar
+            </button>
           </div>
         </div>
       </div>`;
