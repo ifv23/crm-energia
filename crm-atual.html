@@ -492,6 +492,7 @@ tr:active td{background:#2a2a2a;}
 // ── STATE ──────────────────────────────────────────────────────────────────
 const DEFAULT_STATE = {
   tenants:[], readings:{}, edp:null, charges:{},
+  edpPendente:null,   // set by email monitor via Apps Script
   edpHistory:{},      // {month: {kwh, total_brl, costPerKwh}}
   chargesHistory:{},  // {month: {tenantId: {diff,amount,status}}}
   photoHistory:{},    // {month: {tenantId: {prev:{b64,manual}, cur:{b64,manual}}}}
@@ -556,6 +557,10 @@ function loadState(){
     if(data.edpHistory) S.edpHistory = data.edpHistory;
     if(data.chargesHistory) S.chargesHistory = data.chargesHistory;
     if(data.photoHistory) S.photoHistory = data.photoHistory;
+    // Check for pending EDP from email monitor
+    if(data.edpPendente){
+      S.edpPendente = data.edpPendente;
+    }
     // Restore current month EDP and charges if saved
     if(S.edpHistory[CUR]) S.edp = S.edpHistory[CUR];
     if(S.chargesHistory[CUR]) S.charges = S.chargesHistory[CUR];
@@ -1532,39 +1537,22 @@ async function driveLoad(){
 async function checkEDPPendente(){
   if(!GDRIVE.token) return;
   try{
-    const res = await driveFetch(
-      "https://www.googleapis.com/drive/v3/files?q=name='edp-pendente.json'+and+trashed=false&fields=files(id,name)"
-    );
-    if(!res) return;
-    const data = await res.json();
-    if(!data.files||data.files.length===0) return;
+    const pendente = S.edpPendente;
+    if(!pendente||!pendente.pdfDriveId) return;
 
-    // Found pending file — show button in drive bar
     const checkBtn = document.getElementById("drive-check-edp-btn");
     if(checkBtn) checkBtn.style.display="";
 
-    const fileId = data.files[0].id;
-    const fileRes = await driveFetch(`https://www.googleapis.com/drive/v3/files/${fileId}?alt=media`);
-    if(!fileRes) return;
-    const pendente = await fileRes.json();
-    if(!pendente||!pendente.pdfDriveId) return;
-
-    const msg = `📧 Conta EDP recebida por email!
-
-Arquivo: ${pendente.pdfNome||"conta.pdf"}
-
-Deseja ler com IA agora?`;
+    const msg = "📧 Conta EDP recebida por email!\n\nArquivo: "+(pendente.pdfNome||"conta.pdf")+"\n\nDeseja ler com IA agora?";
     if(!confirm(msg)) return;
 
-    // Baixa o PDF do Drive
     driveSetStatus("sync","Baixando PDF...");
-    const pdfRes = await driveFetch(`https://www.googleapis.com/drive/v3/files/${pendente.pdfDriveId}?alt=media`);
+    const pdfRes = await driveFetch("https://www.googleapis.com/drive/v3/files/"+pendente.pdfDriveId+"?alt=media");
     if(!pdfRes){ toast("Erro ao baixar PDF.",true); driveSetStatus("ok","pronto"); return; }
 
     const pdfBlob = await pdfRes.blob();
     const pdfFile = new File([pdfBlob], pendente.pdfNome||"edp.pdf", {type:"application/pdf"});
 
-    // Tenta extração de texto primeiro
     toast("⏳ Lendo PDF...");
     const pdfText = await extractPDFText(pdfFile);
     const {kwh, brl} = parseEDPFromText(pdfText);
@@ -1572,10 +1560,11 @@ Deseja ler com IA agora?`;
     if(kwh && brl){
       S.edp={kwh,total_brl:brl,costPerKwh:brl/kwh};
       S.edpHistory[CUR]={...S.edp};
+      S.edpPendente=null;
       saveState(); render(); calcAllSilent();
       toast("✅ "+kwh+" kWh · "+fmt(brl));
+      if(checkBtn) checkBtn.style.display="none";
     } else {
-      // Fallback: imagem via Claude
       toast("⏳ Analisando com IA...");
       const b64 = await pdfToBase64Image(pdfFile);
       const result = await claude([{role:"user",content:[
@@ -1585,20 +1574,17 @@ Deseja ler com IA agora?`;
       if(result.kwh&&result.total_brl){
         S.edp={kwh:result.kwh,total_brl:result.total_brl,costPerKwh:result.total_brl/result.kwh};
         S.edpHistory[CUR]={...S.edp};
+        S.edpPendente=null;
         saveState(); render(); calcAllSilent();
         toast("✅ "+result.kwh+" kWh · "+fmt(result.total_brl));
+        if(checkBtn) checkBtn.style.display="none";
       } else {
         toast("⚠️ Não consegui ler os valores. Tente o upload manual.",true);
       }
     }
-
-    // Apaga pendente
-    await driveFetch(`https://www.googleapis.com/drive/v3/files/${fileId}`,{method:"DELETE"});
     driveSetStatus("ok","pronto");
-
   }catch(e){ console.error("checkEDPPendente:",e); driveSetStatus("ok","pronto"); }
 }
-
 // Debounced auto-save — waits 1.5s after last action
 let driveSaveTimer=null;
 function driveSaveDebounced(){
