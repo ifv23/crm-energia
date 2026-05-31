@@ -220,6 +220,7 @@ tr:active td{background:#2a2a2a;}
   </div>
   <div style="margin-left:auto;display:flex;gap:6px;">
     <button id="drive-login-btn" class="btn bg bs2" onclick="driveLogin()" style="font-size:11px;padding:3px 10px;">🔗 Conectar Drive</button>
+    <button id="drive-save-btn" class="btn bg bs2" onclick="saveState();driveSave();toast('✅ Salvo no Drive!')" style="display:none;font-size:11px;padding:3px 10px;">💾 Salvar</button>
     <button id="drive-reconnect-btn" class="btn bg bs2" onclick="driveLogin(false)" style="display:none;font-size:11px;padding:3px 10px;">🔄 Reconectar</button>
     <button id="drive-logout-btn" class="btn bg bs2" onclick="driveLogout()" style="display:none;font-size:11px;padding:3px 10px;">Desconectar</button>
     <button id="drive-refresh-btn" class="btn bg bs2" onclick="manualRefresh()" style="display:none;font-size:11px;padding:3px 10px;">🔄</button>
@@ -1219,7 +1220,7 @@ function render(){
       <span style="background:#0d2b0d;color:#4caf50;padding:5px 12px;border-radius:20px;font-size:12px;font-weight:700">✅ Conta registrada</span>
       <span style="font-size:13px;color:#9EA3BF">${S.edp.kwh} kWh · ${fmt(S.edp.total_brl)} · R$ ${S.edp.costPerKwh.toFixed(4)}/kWh</span>
       <button class="btn bg bs2" onclick="openEDP(true)">✏️ Editar</button>
-      <button class="btn bg bs2" onclick="S.edp=null;S.charges={};render()">🗑️</button>
+      <button class="btn bg bs2" onclick="if(confirm('Remover conta EDP de ${mlbl(CUR)}?')){S.edp=null;S.charges={};delete S.edpHistory[CUR];delete S.chargesHistory[CUR];saveState();render();}">🗑️</button>
     </div>`;
   } else {
     ea.innerHTML=`<button class="btn bp" onclick="openEDP()">📋 Upload da conta EDP</button><span style="font-size:12px;color:#808080;margin-left:10px;">A IA extrai kWh e valor automaticamente</span>`;
@@ -1364,6 +1365,7 @@ function driveLogin(silent=false){
       localStorage.setItem("gdrive_token", resp.access_token);
       localStorage.setItem("gdrive_expiry", GDRIVE.tokenExpiry);
       document.getElementById("drive-login-btn").style.display="none";
+      document.getElementById("drive-save-btn").style.display="";
       document.getElementById("drive-reconnect-btn").style.display="";
       document.getElementById("drive-logout-btn").style.display="";
       if(!silent){
@@ -1425,6 +1427,7 @@ function driveLogout(){
   localStorage.removeItem("gdrive_token");
   localStorage.removeItem("gdrive_fileid");
   document.getElementById("drive-login-btn").style.display="";
+  document.getElementById("drive-save-btn").style.display="none";
   document.getElementById("drive-reconnect-btn").style.display="none";
   document.getElementById("drive-logout-btn").style.display="none";
   driveSetStatus("","não conectado");
@@ -1620,6 +1623,7 @@ function driveSaveDebounced(){
     GDRIVE.token = savedDriveToken;
     GDRIVE.tokenExpiry = savedExpiry ? Number(savedExpiry) : 0;
     document.getElementById("drive-login-btn").style.display="none";
+    document.getElementById("drive-save-btn").style.display="";
     document.getElementById("drive-reconnect-btn").style.display="";
     document.getElementById("drive-logout-btn").style.display="";
     driveSetStatus("sync","reconectando...");
