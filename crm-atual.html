@@ -613,7 +613,7 @@ function openEDP(editMode=false){
             onclick="openEDPFullscreen(this.src)"/>
           <div style="display:flex;gap:8px;margin-top:6px;justify-content:center;">
             <button class="btn bg bs2" onclick="openEDPFullscreen('data:${ed.previewMime};base64,${ed.previewB64}')">🔍 Ampliar</button>
-            <button class="btn bg bs2" onclick="downloadEDPPdf('data:${ed.previewMime};base64,${ed.previewB64}','EDP_${CUR}.${ed.previewMime.includes('pdf')?'pdf':'jpg'}')">📤 Compartilhar</button>
+            <button class="btn bg bs2" onclick="shareEDP('${CUR}')">📤 Compartilhar PDF</button>
           </div>
           <div style="font-size:11px;color:#808080;text-align:center;margin-top:4px;">Toque para ampliar · Envie novo arquivo para substituir</div>
         </div>`;
@@ -646,6 +646,20 @@ function downloadEDPPdf(src, filename){
   a.href = src;
   a.download = filename;
   a.click();
+}
+
+function shareEDP(month){
+  const ed = S.edpHistory[month];
+  if(!ed) return;
+  if(ed.pdfB64){
+    // Share as PDF
+    downloadEDPPdf('data:application/pdf;base64,'+ed.pdfB64, 'EDP_'+month+'.pdf');
+  } else if(ed.previewB64){
+    // Fallback: share as image
+    downloadEDPPdf('data:'+ed.previewMime+';base64,'+ed.previewB64, 'EDP_'+month+'.jpg');
+  } else {
+    toast("Sem arquivo salvo para compartilhar.",true);
+  }
 }
 
 // ── API KEY ────────────────────────────────────────────────────────────────
@@ -756,17 +770,27 @@ function parseEDPFromText(text){
   return {kwh, brl};
 }
 
-async function pdfToBase64Image(file){
+async function pdfToBase64Image(file, fullPage=false){
   const buf = await file.arrayBuffer();
   const pdf = await pdfjsLib.getDocument({data:buf}).promise;
   const page = await pdf.getPage(1);
-  const vp = page.getViewport({scale:1.5});
+  // High scale for preview quality
+  const scale = fullPage ? 1.5 : 3.0;
+  const vp = page.getViewport({scale});
   const canvas = document.createElement("canvas");
-  canvas.width=vp.width; canvas.height=vp.height;
-  await page.render({canvasContext:canvas.getContext("2d"),viewport:vp}).promise;
-  const b64 = canvas.toDataURL("image/jpeg",0.7).split(",")[1];
-  console.log("Canvas size:", canvas.width+"x"+canvas.height, "Base64 len:", b64.length);
-  return b64;
+  canvas.width = vp.width;
+  // For preview: only render top 45% of page (where TUSD + Total appear)
+  canvas.height = fullPage ? vp.height : Math.floor(vp.height * 0.45);
+  const ctx = canvas.getContext("2d");
+  ctx.fillStyle = "#fff";
+  ctx.fillRect(0,0,canvas.width,canvas.height);
+  await page.render({canvasContext:ctx, viewport:vp}).promise;
+  return canvas.toDataURL("image/jpeg",0.85).split(",")[1];
+}
+
+async function pdfToBase64Full(file){
+  // Full page at normal scale for sharing
+  return pdfToBase64Image(file, true);
 }
 
 async function handleEDP(input){
@@ -793,7 +817,7 @@ async function handleEDP(input){
         document.getElementById("edp-v").value=brl;
         updEdp(); ut.textContent="✅ "+file.name;
         // Generate preview from PDF canvas for storage
-        try{ const pb64=await pdfToBase64Image(file); edpTempPreview={b64:pb64,mime:"image/jpeg"}; showEDPPreview(pb64,"image/jpeg"); }catch(_){}
+        try{ const pb64=await pdfToBase64Image(file); const pdfFull=await fileToB64(file); edpTempPreview={b64:pb64,mime:"image/jpeg",pdfB64:pdfFull}; showEDPPreview(pb64,"image/jpeg"); }catch(_){}
         toast("✅ "+kwh+" kWh · "+fmt(brl)); return;
       }
       // Fallback: render PDF as image and send to Claude
@@ -864,8 +888,8 @@ function confirmEDP(){
   if(!k||!v||k<=0||v<=0){toast("Preencha kWh e valor.",true);return;}
   S.edp={kwh:k,total_brl:v,costPerKwh:v/k};
   const histEntry = {...S.edp};
-  if(edpTempPreview){ histEntry.previewB64=edpTempPreview.b64; histEntry.previewMime=edpTempPreview.mime; }
-  else if(S.edpHistory[CUR]&&S.edpHistory[CUR].previewB64){ histEntry.previewB64=S.edpHistory[CUR].previewB64; histEntry.previewMime=S.edpHistory[CUR].previewMime; }
+  if(edpTempPreview){ histEntry.previewB64=edpTempPreview.b64; histEntry.previewMime=edpTempPreview.mime; if(edpTempPreview.pdfB64) histEntry.pdfB64=edpTempPreview.pdfB64; }
+  else if(S.edpHistory[CUR]&&S.edpHistory[CUR].previewB64){ histEntry.previewB64=S.edpHistory[CUR].previewB64; histEntry.previewMime=S.edpHistory[CUR].previewMime; if(S.edpHistory[CUR].pdfB64) histEntry.pdfB64=S.edpHistory[CUR].pdfB64; }
   S.edpHistory[CUR] = histEntry;
   edpTempPreview=null;
   saveState();
