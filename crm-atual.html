@@ -1550,10 +1550,14 @@ async function checkEDPPendente(){
     if(!confirm(msg)) return;
 
     driveSetStatus("sync","Baixando PDF...");
-    const pdfRes = await driveFetch("https://www.googleapis.com/drive/v3/files/"+pendente.pdfDriveId+"?alt=media");
-    if(!pdfRes){ toast("Erro ao baixar PDF.",true); driveSetStatus("ok","pronto"); return; }
+    // Use direct fetch with responseType blob for binary PDF
+    const pdfRes = await fetch("https://www.googleapis.com/drive/v3/files/"+pendente.pdfDriveId+"?alt=media", {
+      headers:{"Authorization":"Bearer "+GDRIVE.token}
+    });
+    if(!pdfRes||!pdfRes.ok){ toast("Erro ao baixar PDF.",true); driveSetStatus("ok","pronto"); return; }
 
-    const pdfBlob = await pdfRes.blob();
+    const pdfArrayBuffer = await pdfRes.arrayBuffer();
+    const pdfBlob = new Blob([pdfArrayBuffer], {type:"application/pdf"});
     const pdfFile = new File([pdfBlob], pendente.pdfNome||"edp.pdf", {type:"application/pdf"});
 
     toast("⏳ Lendo PDF...");
