@@ -1314,7 +1314,9 @@ function render(){
     document.getElementById("ch-list").innerHTML=active.filter(t=>S.charges[t.id]).map(t=>{
       const c=S.charges[t.id];
       const prev=getRd(t.id,PREV), cur=getRd(t.id,CUR);
-      const msg=`Olá *${t.name}*! 👋\n\nSegue o resumo do seu consumo de energia referente a *${mlbl(CUR)}*:\n\n⚡ Leitura anterior: ${prev} kWh\n⚡ Leitura atual: ${cur} kWh\n📊 Consumo do mês: ${c.diff} kWh\n\n💡 Custo por kWh este mês: R$ ${S.edp?S.edp.costPerKwh.toFixed(4):"—"}\n💰 *Total a pagar: ${fmt(c.amount)}*\n\nEm caso de dúvidas, estou à disposição. Obrigado! 🙏`;
+      const agua = 50;
+      const total = c.amount + agua;
+      const msg=`Olá *${t.name}*! 👋\n\nSegue o resumo do seu consumo de energia referente a *${mlbl(CUR)}*:\n\n⚡ Leitura anterior: ${prev} kWh\n⚡ Leitura atual: ${cur} kWh\n📊 Consumo do mês: ${c.diff} kWh\n\n💡 Custo por kWh este mês: R$ ${S.edp?S.edp.costPerKwh.toFixed(4):"—"}\n⚡ Valor energia: ${fmt(c.amount)}\n💧 Valor água: R$ 50,00\n💰 *Total a pagar: ${fmt(total)}*\n\n🔑 Chave Pix (celular): 11975870144\n\nPor gentileza enviar o comprovante.\n\nObrigado! 🙏`;
       return `<div class="card" style="margin-bottom:12px;border-left:3px solid #217346">
         <div style="display:flex;justify-content:space-between;align-items:flex-start;gap:10px;flex-wrap:wrap">
           <div style="flex:1;min-width:0">
@@ -1325,7 +1327,7 @@ function render(){
             <div style="background:#1a1a1a;border-radius:3px;padding:10px 12px;font-size:12px;color:#b0b0b0;line-height:1.8;white-space:pre-line">${msg}</div>
           </div>
           <div style="display:flex;flex-direction:column;align-items:flex-end;gap:8px;flex-shrink:0">
-            <div style="font-size:22px;font-weight:700;color:#2ecc71">${fmt(c.amount)}</div>
+            <div style="font-size:22px;font-weight:700;color:#2ecc71">${fmt(total)}</div>
             <button class="btn bg bs2" onclick="navigator.clipboard.writeText(\`${msg.replace(/`/g,'\\`')}\`).then(()=>toast('✅ Copiado!'))" title="Copiar mensagem">
               <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="9" y="9" width="13" height="13" rx="2"/><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/></svg>
               Copiar
