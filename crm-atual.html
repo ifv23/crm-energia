@@ -377,14 +377,14 @@ tr:active td{background:#2a2a2a;}
     <div class="ct">🏠 Análise de locação</div>
     <div style="background:#1a1a1a;border-radius:3px;padding:14px;font-size:13px;color:#b0b0b0;line-height:1.8;white-space:pre-wrap;margin-bottom:12px;">Análise de locação
 
-Para darmos andamento na análise do aluguel, preciso dos seguintes documentos:
+Para darmos andamento na análise do aluguel, envie os seguintes documentos:
 
 1. *RG e CPF* — documento com foto e CPF visível
 2. *Comprovante de renda* — 3 últimos holerites ou declaração de IR. A renda precisa ser no mínimo 3x o valor do aluguel + condomínio
 3. *Comprovante de residência atual* — conta de luz ou água recente (últimos 3 meses)
 4. *Certidões negativas* — gratuitas e online, levam menos de 10 minutos (padrão exigido pelas imobiliárias):
-   - PF: https://antecedentes.dpf.gov.br/antecedentes-criminais/certidao
-   - SSP-ES: https://ssp.sesp.es.gov.br/antecedente
+   - PF: https://servicos.pf.gov.br/epol-sinic-publico/
+   - SSP-ES: https://ssp.sesp.es.gov.br/rgantecedentes
    - TJES: https://sistemas.tjes.jus.br/certidaonegativa/
 5. *2 referências profissionais* — nome e telefone de pessoas que possam falar do seu trabalho
 
@@ -1761,6 +1761,188 @@ async function manualRefresh(){
 if(!('ontouchstart' in window) && !navigator.maxTouchPoints){
   const btn = document.getElementById("drive-refresh-btn");
   if(btn) btn.style.display="";
+}
+
+// ── ALUGUEL ────────────────────────────────────────────────────────────────
+const RENTAL_TEXT = `Análise de locação
+
+Para darmos andamento na análise do aluguel, envie os seguintes documentos:
+
+1. RG e CPF — documento com foto e CPF visível
+2. Comprovante de renda — 3 últimos holerites ou declaração de IR. A renda precisa ser no mínimo 3x o valor do aluguel + condomínio
+3. Comprovante de residência atual — conta de luz ou água recente (últimos 3 meses)
+4. Certidões negativas — gratuitas e online, levam menos de 10 minutos (padrão exigido pelas imobiliárias):
+   - PF: https://servicos.pf.gov.br/epol-sinic-publico/
+   - SSP-ES: https://ssp.sesp.es.gov.br/rgantecedentes
+   - TJES: https://sistemas.tjes.jus.br/certidaonegativa/
+5. 2 referências profissionais — nome e telefone de pessoas que possam falar do seu trabalho
+
+Assim que receber toda a documentação, encaminho para análise e retorno em até 7 dias.`;
+
+function copyRentalText(){
+  navigator.clipboard.writeText(RENTAL_TEXT)
+    .then(()=>toast("✅ Texto copiado!"))
+    .catch(()=>{
+      // Fallback for browsers that block clipboard
+      const ta = document.createElement("textarea");
+      ta.value = RENTAL_TEXT;
+      ta.style.position="fixed"; ta.style.opacity="0";
+      document.body.appendChild(ta);
+      ta.focus(); ta.select();
+      try{ document.execCommand("copy"); toast("✅ Texto copiado!"); }
+      catch(e){ toast("Erro ao copiar.",true); }
+      document.body.removeChild(ta);
+    });
+}
+
+async function generateRentalPDF(){
+  try{
+    if(typeof window.jspdf === "undefined"){
+      toast("⏳ Carregando biblioteca PDF...",false);
+      setTimeout(generateRentalPDF, 800);
+      return;
+    }
+    const { jsPDF } = window.jspdf;
+    const doc = new jsPDF({orientation:"portrait",unit:"mm",format:"a4"});
+    const margin = 22;
+    const pageW = 210;
+    const maxW = pageW - margin * 2;
+    let y = 28;
+
+    // ── Header ──
+    doc.setFont("helvetica","bold");
+    doc.setFontSize(18);
+    doc.text("Análise de Locação", pageW/2, y, {align:"center"});
+    y += 8;
+    doc.setDrawColor(80,80,80);
+    doc.setLineWidth(0.5);
+    doc.line(margin, y, pageW-margin, y);
+    y += 12;
+
+    // ── Intro ──
+    doc.setFont("helvetica","normal");
+    doc.setFontSize(11);
+    doc.setTextColor(40,40,40);
+    const intro = doc.splitTextToSize(
+      "Para darmos andamento na análise do aluguel, envie os seguintes documentos:",
+      maxW
+    );
+    doc.text(intro, margin, y);
+    y += intro.length * 6 + 8;
+
+    // ── Items ──
+    const items = [
+      {
+        num:"1.",
+        title:"RG e CPF",
+        body:"Documento oficial com foto e CPF visível."
+      },
+      {
+        num:"2.",
+        title:"Comprovante de renda",
+        body:"3 últimos holerites ou declaração de IR. A renda deve ser no mínimo 3× o valor do aluguel + condomínio."
+      },
+      {
+        num:"3.",
+        title:"Comprovante de residência",
+        body:"Conta de luz ou água recente (últimos 3 meses)."
+      },
+      {
+        num:"4.",
+        title:"Certidões negativas",
+        body:"Gratuitas e online, levam menos de 10 minutos (padrão exigido pelas imobiliárias).",
+        links:[
+          {label:"Polícia Federal:", url:"https://servicos.pf.gov.br/epol-sinic-publico/"},
+          {label:"SSP-ES:", url:"https://ssp.sesp.es.gov.br/rgantecedentes"},
+          {label:"TJES:", url:"https://sistemas.tjes.jus.br/certidaonegativa/"},
+        ]
+      },
+      {
+        num:"5.",
+        title:"Referências profissionais",
+        body:"Indique 2 pessoas que possam falar do seu trabalho (nome e telefone)."
+      },
+    ];
+
+    for(const item of items){
+      if(y > 255){ doc.addPage(); y = 22; }
+
+      // Number + bold title
+      doc.setFont("helvetica","bold");
+      doc.setFontSize(11);
+      doc.text(item.num, margin, y);
+      doc.text(item.title, margin + 8, y);
+      y += 6;
+
+      // Body text
+      doc.setFont("helvetica","normal");
+      doc.setFontSize(10);
+      doc.setTextColor(60,60,60);
+      const bodyLines = doc.splitTextToSize(item.body, maxW - 8);
+      doc.text(bodyLines, margin + 8, y);
+      y += bodyLines.length * 5;
+
+      // Links
+      if(item.links){
+        for(const link of item.links){
+          if(y > 270){ doc.addPage(); y = 22; }
+          y += 3;
+          doc.setFont("helvetica","normal");
+          doc.setFontSize(9);
+          doc.setTextColor(60,60,60);
+          doc.text(link.label, margin + 10, y);
+          const labelW = doc.getTextWidth(link.label + " ");
+          doc.setTextColor(0,80,180);
+          doc.textWithLink(link.url, margin + 10 + labelW + 1, y, {url: link.url});
+          doc.setTextColor(60,60,60);
+          y += 5;
+        }
+      }
+      y += 6;
+    }
+
+    // ── Footer line ──
+    doc.setDrawColor(180,180,180);
+    doc.setLineWidth(0.3);
+    doc.line(margin, y, pageW-margin, y);
+    y += 7;
+    doc.setFont("helvetica","italic");
+    doc.setFontSize(10);
+    doc.setTextColor(100,100,100);
+    doc.text("Assim que receber toda a documentação, encaminharei para análise e retornarei em até 7 dias.", margin, y, {maxWidth: maxW});
+
+    // ── Generate blob and open share dialog on mobile, download on desktop ──
+    const pdfBlob = doc.output("blob");
+
+    // Check if mobile (touch device)
+    const isMobile = ('ontouchstart' in window) || navigator.maxTouchPoints > 0;
+
+    if(isMobile && navigator.share && navigator.canShare){
+      try{
+        const file = new File([pdfBlob], "Analise_Locacao.pdf", {type:"application/pdf"});
+        if(navigator.canShare({files:[file]})){
+          await navigator.share({files:[file], title:"Análise de Locação"});
+          toast("✅ PDF compartilhado!");
+          return;
+        }
+      }catch(e){ /* fallback to download */ }
+    }
+
+    // Desktop or fallback: download directly
+    const pdfUrl = URL.createObjectURL(pdfBlob);
+    const a = document.createElement("a");
+    a.href = pdfUrl;
+    a.download = "Analise_Locacao.pdf";
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+    setTimeout(()=>URL.revokeObjectURL(pdfUrl), 1000);
+    toast("✅ PDF baixado!");
+
+  }catch(e){
+    console.error("PDF error:",e);
+    toast("Erro ao gerar PDF: "+e.message, true);
+  }
 }
 
 // ── BACKGROUND SYNC ────────────────────────────────────────────────────────
