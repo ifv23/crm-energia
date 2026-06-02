@@ -95,10 +95,15 @@ body{font-family:'Inter','Segoe UI',sans-serif;background:var(--bg);color:#d4d4d
 input[type=text],input[type=number],input[type=password]{
   width:100%;padding:9px 10px;border-radius:3px;
   border:1px solid #505050;background:#1a1a1a;
-  color:#d4d4d4;font-size:14px;
+  color:#d4d4d4;font-size:16px;
   font-family:'Inter','Segoe UI',sans-serif;
   outline:none;transition:border-color .1s;
   -webkit-appearance:none;
+}
+@media(min-width:640px){
+  input[type=text],input[type=number],input[type=password]{
+    font-size:13px;
+  }
 }
 input:focus{border-color:#217346;}
 
@@ -1855,149 +1860,129 @@ async function generateContractPDF(){
     if(!f[k]){ err.textContent="Preencha todos os campos."; err.style.display="block"; return; }
   }
 
-  if(!S.apiKey){ err.textContent="Configure a chave API Anthropic em ⚙️ Config."; err.style.display="block"; return; }
+  if(typeof window.jspdf === "undefined"){
+    toast("⏳ Carregando biblioteca PDF...");
+    setTimeout(generateContractPDF, 800);
+    return;
+  }
 
-  // Calculate dates
-  const [d,m,yr] = f.datainicio.split("/").map(Number);
-  const dtFim = new Date(yr, m-1+12, d-1);
-  const dataFim = String(dtFim.getDate()).padStart(2,"0")+"/"+String(dtFim.getMonth()+1).padStart(2,"0")+"/"+dtFim.getFullYear();
-  const valorTotal = (parseFloat(f.valor)*12).toLocaleString("pt-BR");
-  const vedaBebidas = f.bebidas ? "nem a venda de bebidas alcoólicas e " : "";
-
-  const btn = document.querySelector("#pg-rental button[onclick=\"generateContractPDF()\"]") || document.getElementById("ct-error").previousElementSibling;
-  err.textContent=""; 
   const origBtn = document.querySelector("button[onclick='generateContractPDF()']");
-  if(origBtn){ origBtn.disabled=true; origBtn.textContent="⏳ Gerando PDF..."; }
+  if(origBtn){ origBtn.disabled=true; origBtn.textContent="⏳ Gerando..."; }
 
   try{
-    // Use Anthropic API to generate PDF via Python code execution
-    // We'll use the API to get base64 PDF content
-    const contractText = `Contrato de Locação não residencial
-
-Pelo presente instrumento particular, de um lado, como LOCADOR, Ian Felisberto Villefort, CPF/RG 152.495.727-58, brasileiro, solteiro, analista comercial, residente e domiciliado no endereço Rodovia Santa Cruz, 615, Praia Grande, Fundão - ES e, de outro lado, como LOCATÁRIO, ${f.nome}, ${f.nac}, ${f.ecivil}, ${f.prof}, RG ${f.rg}, inscrito sob o CPF ${f.cpf}, residente e domiciliado em ${f.rua}, ${f.numend}, ${f.bairro} - ${f.cidade} ${f.estado} - CEP ${f.cep}, resolvem celebrar o presente contrato de locação, o qual reger-se-á pelas seguintes cláusulas e condições:
-
-I. OBJETO: Constitui objeto do presente contrato a locação do imóvel situado na Rodovia Santa Cruz, ${f.numimovel}, Praia Grande, Fundão - ES, composto na parte em questão por 1 sala com aproximadamente 10 m².
-
-II. PRAZO: O prazo de locação é de prazo determinado de 12 meses, tendo início em ${f.datainicio} e término previsto para o dia ${dataFim}. O contrato por prazo determinado cessa, de pleno direito, findo o prazo estipulado, independentemente de notificação ou aviso. Caso, ao fim do contrato, o LOCATÁRIO continuar no imóvel por mais de 30 (trinta) dias, sem oposição do LOCADOR, ficará a locação prorrogada automaticamente por prazo indeterminado, nas mesmas bases contratuais; Caso a locação tenha sido prorrogada por prazo indeterminado, o contrato poderá ser cancelado a qualquer momento, desde que respeitados os 30 dias de aviso prévio (artigo 57 da lei do inquilinato). Após o recebimento de pedido por escrito do LOCATÁRIO para encerramento do contrato, o LOCADOR terá o prazo de dez dias para efetuar a vistoria do imóvel, correndo por conta do LOCATÁRIO o aluguel até a efetiva devolução do imóvel ao LOCADOR.
-
-III. FINALIDADE: A sala comercial é locada para uso exclusivamente como ${f.comercio}, não podendo, o locatário, exercer outro ramo senão o aqui estipulado, não sendo permitida a ocupação fora dos limites da sala, ${vedaBebidas}nem de alimentos. Fumar no interior do estabelecimento também não é permitido.
-
-IV. PREÇO E FORMA DE PAGAMENTO: O valor do aluguel mensal é de ${f.valor} reais, a ser pago todo dia 10, totalizando ${valorTotal} reais ao longo dos 12 meses de contrato. Findo esse prazo, os valores podem sofrer reajuste, como especificado na cláusula de número VI.
-
-V. ATRASO NO PAGAMENTO: O não pagamento do aluguel no prazo ajustado na cláusula 4ª implicará em multa de 2% (dois por cento) sobre o valor do débito, juros de 1% (um por cento) ao mês e correção monetária.
-
-VI. REAJUSTE DO ALUGUEL: O aluguel pactuado na cláusula anterior poderá sofrer reajustes anuais com base na variação do Índice Nacional de Preços ao Consumidor Amplo (IPCA) ou outro índice que porventura venha a substituí-lo. O aluguel não poderá sofrer reajuste acima dos índices, a não ser que seja expressamente acordado para ajustar o valor ao nível de mercado atual.
-
-VII. ALVARÁ DE VISTORIA DO CORPO DE BOMBEIROS: O LOCATÁRIO obriga-se, às suas expensas, a providenciar, obter e manter válido durante toda a vigência do contrato o Alvará do Corpo de Bombeiros (AVCB) exigido pela legislação vigente, de acordo com a atividade exercida no imóvel. O LOCATÁRIO compromete-se ainda a renovar o referido alvará sempre que necessário, bem como a adequar o imóvel às exigências técnicas do Corpo de Bombeiros, assumindo integral responsabilidade por eventuais adequações, instalações, equipamentos e manutenções exigidas, desde que compatíveis com o uso contratado. A não obtenção, não renovação ou vencimento do Alvará do Corpo de Bombeiros caracterizará infração contratual grave, sujeitando o LOCATÁRIO à rescisão contratual. O LOCATÁRIO declara ciência de que nenhuma atividade poderá ser exercida no imóvel em desacordo com as normas de segurança, isentando o LOCADOR de qualquer responsabilidade decorrente do descumprimento desta obrigação.
-
-VIII. BENFEITORIAS, ALTERAÇÕES E USO DO IMÓVEL: Qualquer alteração, intervenção ou adaptação nas instalações elétricas ou hidráulicas do imóvel somente poderá ser realizada mediante prévia e expressa autorização do LOCADOR. As intervenções deverão ser executadas por profissionais legalmente habilitados, aprovados ou indicados pelo LOCADOR. Fica a cargo do locatário a decoração, manutenção e escolha da decoração interna do imóvel. Fica a cargo do locatário a preservação da fachada sem que faça alterações no exterior do imóvel, a não ser por uma placa que identifique o estabelecimento. O locatário obriga-se a manter o imóvel locado em boas condições de higiene, limpeza e conservação, mantendo em perfeito estado as suas instalações elétricas e hidráulicas, a fim de restituí-lo no estado em que recebeu. O locador obriga-se a garantir a segurança estrutural do imóvel, assim como suas demais obrigações legais.
-
-IX. EXIGÊNCIAS DOS PODERES PÚBLICOS: Obriga-se o locatário a satisfazer a todas as exigências dos poderes públicos a que der causa.
-
-X. CESSÃO, SUBLOCAÇÃO E EMPRÉSTIMO: O locatário não poderá transferir este contrato, ceder, emprestar, ou sublocar o imóvel no todo ou em parte, sem prévia autorização por escrito do locador.
-
-XI. DESPESAS DE CONDOMÍNIO, CONSUMO E TAXAS: Todas as despesas decorrentes da locação, quais sejam, consumo de água, luz, telefone e gás, ficam a cargo do locatário, cabendo-lhe efetuar diretamente esses pagamentos nas devidas épocas. O valor será acordado entre taxa mínima ou medição, de acordo com o nível do consumo.
-
-XII. VISTORIA: O locatário desde já faculta ao locador examinar ou vistoriar o prédio, sempre que o segundo entender conveniente, desde que previamente acordados dia e hora.
-
-XIII. DEVOLUÇÃO DO IMÓVEL: É de responsabilidade do locatário a devolução do imóvel em boas condições, sem danos ao piso, paredes e instalações. Em caso de entrega com dano carente de reforma em que o locatário falhe em reparar por conta própria, será contratado um prestador de serviços terceiro, com valor a ser pago pelo locatário.
-
-XIV. FORO: Para todas as questões decorrentes deste contrato, será competente o foro da situação do imóvel, seja qual for o domicílio dos contratantes.
-
-E, por estarem, assim ajustados, assinam o presente contrato.`;
-
-    // Call Anthropic API to generate PDF using Python/reportlab
-    const hoje = new Date();
+    const [d,m,yr] = f.datainicio.split("/").map(Number);
+    const dtFim = new Date(yr, m-1+12, d-1);
+    const dataFim = String(dtFim.getDate()).padStart(2,"0")+"/"+String(dtFim.getMonth()+1).padStart(2,"0")+"/"+dtFim.getFullYear();
+    const valorTotal = (parseFloat(f.valor)*12).toLocaleString("pt-BR");
+    const vedaBebidas = f.bebidas ? "nem a venda de bebidas alcoólicas e " : "";
     const meses = ["Janeiro","Fevereiro","Março","Abril","Maio","Junho","Julho","Agosto","Setembro","Outubro","Novembro","Dezembro"];
+    const hoje = new Date();
     const dataAssinatura = String(hoje.getDate()).padStart(2,"0")+" de "+meses[hoje.getMonth()]+" de "+hoje.getFullYear();
 
-    const response = await fetch("https://api.anthropic.com/v1/messages", {
-      method:"POST",
-      headers:{
-        "Content-Type":"application/json",
-        "x-api-key": S.apiKey,
-        "anthropic-version":"2023-06-01",
-        "anthropic-beta":"output-128k-2025-02-19"
-      },
-      body: JSON.stringify({
-        model:"claude-sonnet-4-20250514",
-        max_tokens:4000,
-        messages:[{
-          role:"user",
-          content:`Gere um PDF de contrato de locação usando Python com reportlab. Retorne APENAS o código Python, sem explicações.
+    const { jsPDF } = window.jspdf;
+    // Use mm units — more predictable across devices
+    const doc = new jsPDF({orientation:"portrait", unit:"mm", format:"a4"});
 
-O código deve:
-1. Usar reportlab com estas especificações EXATAS:
-   - Fonte Helvetica 9.5pt, leading 13pt FIXO em todo documento
-   - Margens 2.2cm em todos os lados
-   - Alinhamento justificado no corpo
-   - Exatamente 2 páginas A4
-   - NÃO usar wordWrap='CJK' - usar apenas splitTextToSize do reportlab
-   
-2. Salvar em /tmp/contrato.pdf
+    const PW = 210, PH = 297;
+    const ML = 22, MR = 22, MT = 22, MB = 22;
+    const TW = PW - ML - MR;  // 166mm
+    const FS = 9.5;
+    const LEAD = 4.8;  // ~13pt in mm (1pt = 0.353mm, 13pt = 4.59mm)
 
-3. Texto do contrato (use EXATAMENTE este texto sem alterar nada):
-${contractText}
+    doc.setFont("helvetica","normal");
+    doc.setFontSize(FS);
 
-Fundão, ${dataAssinatura}.
+    let cy = MT;
 
-4. Assinaturas (centralizadas, cada uma em bloco separado):
-   - 3 linhas de espaço após "E, por estarem..."
-   - "Fundão, ${dataAssinatura}." centralizado
-   - 5 linhas de espaço
-   - 52 underscores + "Ian Felisberto Villefort" centralizados
-   - 5 linhas de espaço  
-   - 52 underscores + "${f.nome}" centralizados
-
-5. No final do código, imprimir o PDF em base64:
-import base64
-with open('/tmp/contrato.pdf','rb') as f:
-    print("BASE64_START:" + base64.b64encode(f.read()).decode() + ":BASE64_END")
-
-Retorne APENAS o código Python executável.`
-        }]
-      })
-    });
-
-    const data = await response.json();
-    const pythonCode = data.content[0].text;
-
-    // Execute the Python code via a second API call with code interpreter concept
-    // Since we can't run Python in browser, we'll use the API to also execute and return base64
-    const execResponse = await fetch("https://api.anthropic.com/v1/messages", {
-      method:"POST",
-      headers:{
-        "Content-Type":"application/json",
-        "x-api-key": S.apiKey,
-        "anthropic-version":"2023-06-01",
-        "anthropic-beta":"output-128k-2025-02-19"
-      },
-      body: JSON.stringify({
-        model:"claude-sonnet-4-20250514",
-        max_tokens:8000,
-        messages:[{
-          role:"user",
-          content:`Execute este código Python e retorne APENAS a string base64 do PDF entre as marcações BASE64_START: e :BASE64_END. Não inclua mais nada na resposta.
-
-${pythonCode}`
-        }]
-      })
-    });
-
-    const execData = await execResponse.json();
-    const execText = execData.content[0].text;
-    const b64Match = execText.match(/BASE64_START:([\s\S]+?):BASE64_END/);
-    
-    if(!b64Match){
-      throw new Error("Não foi possível gerar o PDF. Tente novamente.");
+    function newPageIfNeeded(extraLines){
+      if(cy + (extraLines * LEAD) > PH - MB){
+        doc.addPage();
+        cy = MT;
+      }
     }
 
-    const b64 = b64Match[1].replace(/\s/g,"");
-    const binary = atob(b64);
-    const bytes = new Uint8Array(binary.length);
-    for(let i=0;i<binary.length;i++) bytes[i]=binary.charCodeAt(i);
-    const pdfBlob = new Blob([bytes],{type:"application/pdf"});
+    function addParagraph(text, options={}){
+      const bold = options.bold || false;
+      const align = options.align || "left";
+      const after = options.after !== undefined ? options.after : LEAD;
+      doc.setFont("helvetica", bold ? "bold" : "normal");
+      doc.setFontSize(options.size || FS);
+      const lines = doc.splitTextToSize(text, TW);
+      lines.forEach((line, i) => {
+        newPageIfNeeded(1);
+        const isLast = i === lines.length - 1;
+        const textAlign = (align === "justify" && !isLast) ? "justify" : (align === "justify" ? "left" : align);
+        doc.text(line, align === "center" ? PW/2 : ML, cy, {align: textAlign, maxWidth: TW});
+        cy += LEAD;
+      });
+      cy += after;
+    }
 
+    function addClause(roman, rest){
+      const prefix = roman + ". ";
+      const lines = doc.splitTextToSize(prefix + rest, TW);
+      lines.forEach((line, i) => {
+        newPageIfNeeded(1);
+        if(i === 0){
+          // Bold the roman numeral
+          const boldW = doc.getTextWidth(prefix);
+          doc.setFont("helvetica","bold");
+          doc.text(prefix, ML, cy);
+          doc.setFont("helvetica","normal");
+          const restOfLine = line.slice(prefix.length);
+          if(restOfLine) doc.text(restOfLine, ML + boldW, cy);
+        } else {
+          doc.text(line, ML, cy);
+        }
+        cy += LEAD;
+      });
+      cy += LEAD * 0.5;
+    }
+
+    // Title
+    addParagraph("Contrato de Locação não residencial", {bold:true, align:"center", size:11, after:LEAD*1.2});
+
+    // Intro paragraph
+    addParagraph(
+      `Pelo presente instrumento particular, de um lado, como LOCADOR, Ian Felisberto Villefort, CPF/RG 152.495.727-58, brasileiro, solteiro, analista comercial, residente e domiciliado no endereço Rodovia Santa Cruz, 615, Praia Grande, Fundão - ES e, de outro lado, como LOCATÁRIO, ${f.nome}, ${f.nac}, ${f.ecivil}, ${f.prof}, RG ${f.rg}, inscrito sob o CPF ${f.cpf}, residente e domiciliado em ${f.rua}, ${f.numend}, ${f.bairro} - ${f.cidade} ${f.estado} - CEP ${f.cep}, resolvem celebrar o presente contrato de locação, o qual reger-se-á pelas seguintes cláusulas e condições:`,
+      {align:"justify", after:LEAD*0.8}
+    );
+
+    const clauses = [
+      ["I. OBJETO", `Constitui objeto do presente contrato a locação do imóvel situado na Rodovia Santa Cruz, ${f.numimovel}, Praia Grande, Fundão - ES, composto na parte em questão por 1 sala com aproximadamente 10 m².`],
+      ["II. PRAZO", `O prazo de locação é de prazo determinado de 12 meses, tendo início em ${f.datainicio} e término previsto para o dia ${dataFim}. O contrato por prazo determinado cessa, de pleno direito, findo o prazo estipulado, independentemente de notificação ou aviso. Caso, ao fim do contrato, o LOCATÁRIO continuar no imóvel por mais de 30 (trinta) dias, sem oposição do LOCADOR, ficará a locação prorrogada automaticamente por prazo indeterminado, nas mesmas bases contratuais; Caso a locação tenha sido prorrogada por prazo indeterminado, o contrato poderá ser cancelado a qualquer momento, desde que respeitados os 30 dias de aviso prévio (artigo 57 da lei do inquilinato). Após o recebimento de pedido por escrito do LOCATÁRIO para encerramento do contrato, o LOCADOR terá o prazo de dez dias para efetuar a vistoria do imóvel, correndo por conta do LOCATÁRIO o aluguel até a efetiva devolução do imóvel ao LOCADOR.`],
+      ["III. FINALIDADE", `A sala comercial é locada para uso exclusivamente como ${f.comercio}, não podendo, o locatário, exercer outro ramo senão o aqui estipulado, não sendo permitida a ocupação fora dos limites da sala, ${vedaBebidas}nem de alimentos. Fumar no interior do estabelecimento também não é permitido.`],
+      ["IV. PREÇO E FORMA DE PAGAMENTO", `O valor do aluguel mensal é de ${f.valor} reais, a ser pago todo dia 10, totalizando ${valorTotal} reais ao longo dos 12 meses de contrato. Findo esse prazo, os valores podem sofrer reajuste, como especificado na cláusula de número VI.`],
+      ["V. ATRASO NO PAGAMENTO", `O não pagamento do aluguel no prazo ajustado na cláusula 4ª implicará em multa de 2% (dois por cento) sobre o valor do débito, juros de 1% (um por cento) ao mês e correção monetária.`],
+      ["VI. REAJUSTE DO ALUGUEL", `O aluguel pactuado na cláusula anterior poderá sofrer reajustes anuais com base na variação do Índice Nacional de Preços ao Consumidor Amplo (IPCA) ou outro índice que porventura venha a substituí-lo. O aluguel não poderá sofrer reajuste acima dos índices, a não ser que seja expressamente acordado para ajustar o valor ao nível de mercado atual.`],
+      ["VII. ALVARÁ DE VISTORIA DO CORPO DE BOMBEIROS", `O LOCATÁRIO obriga-se, às suas expensas, a providenciar, obter e manter válido durante toda a vigência do contrato o Alvará do Corpo de Bombeiros (AVCB) exigido pela legislação vigente, de acordo com a atividade exercida no imóvel. O LOCATÁRIO compromete-se ainda a renovar o referido alvará sempre que necessário, bem como a adequar o imóvel às exigências técnicas do Corpo de Bombeiros, assumindo integral responsabilidade por eventuais adequações, instalações, equipamentos e manutenções exigidas, desde que compatíveis com o uso contratado. A não obtenção, não renovação ou vencimento do Alvará do Corpo de Bombeiros caracterizará infração contratual grave, sujeitando o LOCATÁRIO à rescisão contratual. O LOCATÁRIO declara ciência de que nenhuma atividade poderá ser exercida no imóvel em desacordo com as normas de segurança, isentando o LOCADOR de qualquer responsabilidade decorrente do descumprimento desta obrigação.`],
+      ["VIII. BENFEITORIAS, ALTERAÇÕES E USO DO IMÓVEL", `Qualquer alteração, intervenção ou adaptação nas instalações elétricas ou hidráulicas do imóvel somente poderá ser realizada mediante prévia e expressa autorização do LOCADOR. As intervenções deverão ser executadas por profissionais legalmente habilitados, aprovados ou indicados pelo LOCADOR. Fica a cargo do locatário a decoração, manutenção e escolha da decoração interna do imóvel. Fica a cargo do locatário a preservação da fachada sem que faça alterações no exterior do imóvel, a não ser por uma placa que identifique o estabelecimento. O locatário obriga-se a manter o imóvel locado em boas condições de higiene, limpeza e conservação, mantendo em perfeito estado as suas instalações elétricas e hidráulicas, a fim de restituí-lo no estado em que recebeu. O locador obriga-se a garantir a segurança estrutural do imóvel, assim como suas demais obrigações legais.`],
+      ["IX. EXIGÊNCIAS DOS PODERES PÚBLICOS", `Obriga-se o locatário a satisfazer a todas as exigências dos poderes públicos a que der causa.`],
+      ["X. CESSÃO, SUBLOCAÇÃO E EMPRÉSTIMO", `O locatário não poderá transferir este contrato, ceder, emprestar, ou sublocar o imóvel no todo ou em parte, sem prévia autorização por escrito do locador.`],
+      ["XI. DESPESAS DE CONDOMÍNIO, CONSUMO E TAXAS", `Todas as despesas decorrentes da locação, quais sejam, consumo de água, luz, telefone e gás, ficam a cargo do locatário, cabendo-lhe efetuar diretamente esses pagamentos nas devidas épocas. O valor será acordado entre taxa mínima ou medição, de acordo com o nível do consumo.`],
+      ["XII. VISTORIA", `O locatário desde já faculta ao locador examinar ou vistoriar o prédio, sempre que o segundo entender conveniente, desde que previamente acordados dia e hora.`],
+      ["XIII. DEVOLUÇÃO DO IMÓVEL", `É de responsabilidade do locatário a devolução do imóvel em boas condições, sem danos ao piso, paredes e instalações. Em caso de entrega com dano carente de reforma em que o locatário falhe em reparar por conta própria, será contratado um prestador de serviços terceiro, com valor a ser pago pelo locatário.`],
+      ["XIV. FORO", `Para todas as questões decorrentes deste contrato, será competente o foro da situação do imóvel, seja qual for o domicílio dos contratantes.`],
+    ];
+
+    clauses.forEach(([roman, text]) => {
+      addClause(roman, text);
+    });
+
+    addParagraph("E, por estarem, assim ajustados, assinam o presente contrato.", {align:"justify", after:LEAD*3});
+
+    // Date — centered
+    addParagraph(`Fundão, ${dataAssinatura}.`, {align:"center", after:LEAD*5});
+
+    // Signatures
+    const SIG = "_".repeat(48);
+    addParagraph(SIG, {align:"center", after:LEAD*0.5});
+    addParagraph("Ian Felisberto Villefort", {align:"center", after:LEAD*5});
+    addParagraph(SIG, {align:"center", after:LEAD*0.5});
+    addParagraph(f.nome, {align:"center", after:0});
+
+    // Output
+    const pdfBlob = doc.output("blob");
     const isMobile = ('ontouchstart' in window)||navigator.maxTouchPoints>0;
     if(isMobile && navigator.share && navigator.canShare){
       try{
@@ -2018,7 +2003,7 @@ ${pythonCode}`
 
   }catch(e){
     err.textContent="Erro: "+e.message; err.style.display="block";
-    toast("Erro ao gerar contrato.",true);
+    console.error(e);
   }finally{
     if(origBtn){ origBtn.disabled=false; origBtn.textContent="📄 Gerar contrato PDF"; }
   }
