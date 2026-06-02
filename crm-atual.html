@@ -374,8 +374,17 @@ tr:active td{background:#2a2a2a;}
 <!-- ALUGUEL -->
 <div class="pg" id="pg-rental">
   <div class="card">
-    <div class="ct">🏠 Análise de locação</div>
-    <div style="background:#1a1a1a;border-radius:3px;padding:14px;font-size:13px;color:#b0b0b0;line-height:1.8;white-space:pre-wrap;margin-bottom:12px;">Análise de locação
+    <div class="ct" style="display:flex;justify-content:space-between;align-items:center;margin-bottom:8px;">
+      <span>🏠 Análise de locação</span>
+      <button onclick="toggleRentalText()" id="rental-toggle-btn" class="btn bg bs2" style="font-size:11px;padding:3px 10px;">▼ Expandir</button>
+    </div>
+    <!-- Preview (always visible) -->
+    <div style="background:#1a1a1a;border-radius:3px;padding:10px 14px;font-size:12px;color:#808080;line-height:1.6;margin-bottom:8px;overflow:hidden;max-height:52px;position:relative;" id="rental-preview">
+      <span style="color:#b0b0b0">Para darmos andamento na análise do aluguel, envie os seguintes documentos: RG e CPF, comprovante de renda, residência e certidões...</span>
+      <div style="position:absolute;bottom:0;left:0;right:0;height:24px;background:linear-gradient(transparent,#1a1a1a);"></div>
+    </div>
+    <!-- Full text (collapsed by default) -->
+    <div id="rental-full-text" style="display:none;background:#1a1a1a;border-radius:3px;padding:14px;font-size:13px;color:#b0b0b0;line-height:1.8;white-space:pre-wrap;margin-bottom:12px;">Análise de locação
 
 Para darmos andamento na análise do aluguel, envie os seguintes documentos:
 
@@ -398,6 +407,59 @@ Assim que receber toda a documentação, encaminho para análise e retorno em at
         📄 Gerar PDF
       </button>
     </div>
+  </div>
+
+  <div class="card" style="margin-top:12px">
+    <div class="ct">📄 Gerar contrato de locação</div>
+    <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-bottom:8px;">
+      <div><div class="fl">Nome completo</div><input type="text" id="ct-nome" placeholder="João da Silva"/></div>
+      <div><div class="fl">Nacionalidade</div><input type="text" id="ct-nac" placeholder="brasileiro(a)"/></div>
+    </div>
+    <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-bottom:8px;">
+      <div><div class="fl">Estado civil</div><input type="text" id="ct-ecivil" placeholder="solteiro(a)"/></div>
+      <div><div class="fl">Profissão</div><input type="text" id="ct-prof" placeholder="comerciante"/></div>
+    </div>
+    <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-bottom:8px;">
+      <div><div class="fl">RG</div><input type="text" id="ct-rg" placeholder="1.234.567 ES"/></div>
+      <div><div class="fl">CPF</div><input type="text" id="ct-cpf" placeholder="000.000.000-00"/></div>
+    </div>
+    <div style="display:grid;grid-template-columns:1fr auto;gap:8px;margin-bottom:4px;">
+      <div><div class="fl">CEP</div>
+        <div style="display:flex;gap:6px;">
+          <input type="text" id="ct-cep" placeholder="29000-000" maxlength="9" oninput="formatCEP(this)" onblur="buscarCEP()"/>
+          <button class="btn bg bs2" onclick="buscarCEP()" id="cep-btn" title="Buscar CEP">🔍</button>
+        </div>
+        <div id="cep-status" style="font-size:10px;margin-top:3px;color:#808080;"></div>
+      </div>
+    </div>
+    <div style="margin-bottom:8px"><div class="fl">Rua do locatário</div><input type="text" id="ct-rua" placeholder="Preenchido pelo CEP ou edite manualmente"/></div>
+    <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-bottom:8px;">
+      <div><div class="fl">Nº</div><input type="text" id="ct-numend" placeholder="123"/></div>
+      <div><div class="fl">Estado</div><input type="text" id="ct-estado" placeholder="ES" maxlength="2"/></div>
+    </div>
+    <div style="display:grid;grid-template-columns:2fr 1fr;gap:8px;margin-bottom:8px;">
+      <div><div class="fl">Bairro</div><input type="text" id="ct-bairro" placeholder="Centro"/></div>
+      <div><div class="fl">Cidade</div><input type="text" id="ct-cidade" placeholder="Fundão"/></div>
+    </div>
+    <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-bottom:8px;">
+      <div><div class="fl">Nº do imóvel locado</div><input type="text" id="ct-numimovel" placeholder="648"/></div>
+      <div><div class="fl">Valor do aluguel (R$)</div><input type="number" id="ct-valor" placeholder="900"/></div>
+    </div>
+    <div style="margin-bottom:8px"><div class="fl">Tipo de comércio</div><input type="text" id="ct-comercio" placeholder="depósito e loja de artesanato"/></div>
+    <div style="margin-bottom:8px"><div class="fl">Data de início (dd/mm/aaaa)</div><input type="text" id="ct-datainicio" placeholder="01/06/2026"/></div>
+    <div style="margin-bottom:14px">
+      <div class="fl">Vedação de bebidas alcoólicas?</div>
+      <div style="display:flex;gap:16px;margin-top:6px;">
+        <label style="display:flex;align-items:center;gap:6px;cursor:pointer;font-size:13px;color:#d4d4d4;">
+          <input type="radio" name="ct-bebidas" value="sim" checked style="accent-color:#217346"> Sim
+        </label>
+        <label style="display:flex;align-items:center;gap:6px;cursor:pointer;font-size:13px;color:#d4d4d4;">
+          <input type="radio" name="ct-bebidas" value="nao" style="accent-color:#217346"> Não
+        </label>
+      </div>
+    </div>
+    <button class="btn bp btn-full" onclick="generateContractPDF()">📄 Gerar contrato PDF</button>
+    <div id="ct-error" style="display:none;margin-top:8px;font-size:12px;color:#e74c3c;"></div>
   </div>
 </div>
 
@@ -1763,7 +1825,224 @@ if(!('ontouchstart' in window) && !navigator.maxTouchPoints){
   if(btn) btn.style.display="";
 }
 
+// ── CONTRATO DE LOCAÇÃO ────────────────────────────────────────────────────
+async function generateContractPDF(){
+  const err = document.getElementById("ct-error");
+  err.style.display="none";
+
+  // Collect fields
+  const f = {
+    nome:      document.getElementById("ct-nome").value.trim(),
+    nac:       document.getElementById("ct-nac").value.trim(),
+    ecivil:    document.getElementById("ct-ecivil").value.trim(),
+    prof:      document.getElementById("ct-prof").value.trim(),
+    rg:        document.getElementById("ct-rg").value.trim(),
+    cpf:       document.getElementById("ct-cpf").value.trim(),
+    rua:       document.getElementById("ct-rua").value.trim(),
+    bairro:    document.getElementById("ct-bairro").value.trim(),
+    numend:    document.getElementById("ct-numend").value.trim(),
+    cep:       document.getElementById("ct-cep").value.trim(),
+    cidade:    document.getElementById("ct-cidade").value.trim(),
+    estado:    document.getElementById("ct-estado").value.trim(),
+    numimovel: document.getElementById("ct-numimovel").value.trim(),
+    valor:     document.getElementById("ct-valor").value.trim(),
+    comercio:  document.getElementById("ct-comercio").value.trim(),
+    datainicio:document.getElementById("ct-datainicio").value.trim(),
+    bebidas:   document.querySelector('input[name="ct-bebidas"]:checked').value === "sim",
+  };
+
+  // Validation
+  const obrigatorios = ["nome","nac","ecivil","prof","rg","cpf","rua","bairro","numend","cep","cidade","estado","numimovel","valor","comercio","datainicio"];
+  for(const k of obrigatorios){
+    if(!f[k]){ err.textContent="Preencha todos os campos."; err.style.display="block"; return; }
+  }
+
+  if(typeof window.jspdf === "undefined"){
+    toast("⏳ Carregando biblioteca PDF...");
+    setTimeout(generateContractPDF, 800);
+    return;
+  }
+
+  // Calculate dates
+  const [d,m,yr] = f.datainicio.split("/").map(Number);
+  const dtInicio = new Date(yr, m-1, d);
+  const dtFim = new Date(yr, m-1+12, d-1);
+  const dataFim = `${String(dtFim.getDate()).padStart(2,"0")}/${String(dtFim.getMonth()+1).padStart(2,"0")}/${dtFim.getFullYear()}`;
+  const valorTotal = (parseFloat(f.valor) * 12).toLocaleString("pt-BR");
+
+  // Auto date
+  const meses = ["Janeiro","Fevereiro","Março","Abril","Maio","Junho","Julho","Agosto","Setembro","Outubro","Novembro","Dezembro"];
+  const hoje = new Date();
+  const dataAssinatura = `${String(hoje.getDate()).padStart(2,"0")} de ${meses[hoje.getMonth()]} de ${hoje.getFullYear()}`;
+
+  const vedaBebidas = f.bebidas ? "nem a venda de bebidas alcoólicas e " : "";
+
+  const { jsPDF } = window.jspdf;
+  const doc = new jsPDF({orientation:"portrait", unit:"pt", format:"a4"});
+
+  const PW = 595.28, PH = 841.89;
+  const ML = 62, MR = 62, MT = 62, MB = 62;
+  const TW = PW - ML - MR;
+  const FS = 9.5, LEAD = 13, FONT = "helvetica";
+
+  doc.setFont(FONT,"normal");
+  doc.setFontSize(FS);
+
+  let cY = MT;
+
+  function addText(text, options={}){
+    const bold = options.bold || false;
+    const align = options.align || "justify";
+    const extraAfter = options.after || 7;
+    doc.setFont(FONT, bold ? "bold" : "normal");
+    doc.setFontSize(options.size || FS);
+    const lines = doc.splitTextToSize(text, TW);
+    for(let i=0; i<lines.length; i++){
+      if(cY > PH - MB){ doc.addPage(); cY = MT; }
+      const x = align==="center" ? PW/2 : ML;
+      doc.text(lines[i], x, cY, {align: align==="justify" && i===lines.length-1 ? "left" : align});
+      cY += LEAD;
+    }
+    cY += extraAfter - LEAD;
+  }
+
+  // Title
+  addText("Contrato de Locação não residencial", {bold:true, align:"center", size:11, after:10});
+
+  const paragraphs = [
+    `Pelo presente instrumento particular, de um lado, como LOCADOR, Ian Felisberto Villefort, CPF/RG 152.495.727-58, brasileiro, solteiro, analista comercial, residente e domiciliado no endereço Rodovia Santa Cruz, 615, Praia Grande, Fundão - ES e, de outro lado, como LOCATÁRIO, ${f.nome}, ${f.nac}, ${f.ecivil}, ${f.prof}, RG ${f.rg}, inscrito sob o CPF ${f.cpf}, residente e domiciliado em ${f.rua}, ${f.numend}, ${f.bairro} - ${f.cidade} ${f.estado} - CEP ${f.cep}, resolvem celebrar o presente contrato de locação, o qual reger-se-á pelas seguintes cláusulas e condições:`,
+    `I. OBJETO: Constitui objeto do presente contrato a locação do imóvel situado na Rodovia Santa Cruz, ${f.numimovel}, Praia Grande, Fundão - ES, composto na parte em questão por 1 sala com aproximadamente 10 m².`,
+    `II. PRAZO: O prazo de locação é de prazo determinado de 12 meses, tendo início em ${f.datainicio} e término previsto para o dia ${dataFim}. O contrato por prazo determinado cessa, de pleno direito, findo o prazo estipulado, independentemente de notificação ou aviso. Caso, ao fim do contrato, o LOCATÁRIO continuar no imóvel por mais de 30 (trinta) dias, sem oposição do LOCADOR, ficará a locação prorrogada automaticamente por prazo indeterminado, nas mesmas bases contratuais; Caso a locação tenha sido prorrogada por prazo indeterminado, o contrato poderá ser cancelado a qualquer momento, desde que respeitados os 30 dias de aviso prévio (artigo 57 da lei do inquilinato). Após o recebimento de pedido por escrito do LOCATÁRIO para encerramento do contrato, o LOCADOR terá o prazo de dez dias para efetuar a vistoria do imóvel, correndo por conta do LOCATÁRIO o aluguel até a efetiva devolução do imóvel ao LOCADOR.`,
+    `III. FINALIDADE: A sala comercial é locada para uso exclusivamente como ${f.comercio}, não podendo, o locatário, exercer outro ramo senão o aqui estipulado, não sendo permitida a ocupação fora dos limites da sala, ${vedaBebidas}nem de alimentos. Fumar no interior do estabelecimento também não é permitido.`,
+    `IV. PREÇO E FORMA DE PAGAMENTO: O valor do aluguel mensal é de ${f.valor} reais, a ser pago todo dia 10, totalizando ${valorTotal} reais ao longo dos 12 meses de contrato. Findo esse prazo, os valores podem sofrer reajuste, como especificado na cláusula de número VI.`,
+    `V. ATRASO NO PAGAMENTO: O não pagamento do aluguel no prazo ajustado na cláusula 4ª implicará em multa de 2% (dois por cento) sobre o valor do débito, juros de 1% (um por cento) ao mês e correção monetária.`,
+    `VI. REAJUSTE DO ALUGUEL: O aluguel pactuado na cláusula anterior poderá sofrer reajustes anuais com base na variação do Índice Nacional de Preços ao Consumidor Amplo (IPCA) ou outro índice que porventura venha a substituí-lo. O aluguel não poderá sofrer reajuste acima dos índices, a não ser que seja expressamente acordado para ajustar o valor ao nível de mercado atual.`,
+    `VII. ALVARÁ DE VISTORIA DO CORPO DE BOMBEIROS: O LOCATÁRIO obriga-se, às suas expensas, a providenciar, obter e manter válido durante toda a vigência do contrato o Alvará do Corpo de Bombeiros (AVCB) exigido pela legislação vigente, de acordo com a atividade exercida no imóvel. O LOCATÁRIO compromete-se ainda a renovar o referido alvará sempre que necessário, bem como a adequar o imóvel às exigências técnicas do Corpo de Bombeiros, assumindo integral responsabilidade por eventuais adequações, instalações, equipamentos e manutenções exigidas, desde que compatíveis com o uso contratado. A não obtenção, não renovação ou vencimento do Alvará do Corpo de Bombeiros caracterizará infração contratual grave, sujeitando o LOCATÁRIO à rescisão contratual. O LOCATÁRIO declara ciência de que nenhuma atividade poderá ser exercida no imóvel em desacordo com as normas de segurança, isentando o LOCADOR de qualquer responsabilidade decorrente do descumprimento desta obrigação.`,
+    `VIII. BENFEITORIAS, ALTERAÇÕES E USO DO IMÓVEL: Qualquer alteração, intervenção ou adaptação nas instalações elétricas ou hidráulicas do imóvel somente poderá ser realizada mediante prévia e expressa autorização do LOCADOR. As intervenções deverão ser executadas por profissionais legalmente habilitados, aprovados ou indicados pelo LOCADOR. Fica a cargo do locatário a decoração, manutenção e escolha da decoração interna do imóvel. Fica a cargo do locatário a preservação da fachada sem que faça alterações no exterior do imóvel, a não ser por uma placa que identifique o estabelecimento. O locatário obriga-se a manter o imóvel locado em boas condições de higiene, limpeza e conservação, mantendo em perfeito estado as suas instalações elétricas e hidráulicas, a fim de restituí-lo no estado em que recebeu. O locador obriga-se a garantir a segurança estrutural do imóvel, assim como suas demais obrigações legais.`,
+    `IX. EXIGÊNCIAS DOS PODERES PÚBLICOS: Obriga-se o locatário a satisfazer a todas as exigências dos poderes públicos a que der causa.`,
+    `X. CESSÃO, SUBLOCAÇÃO E EMPRÉSTIMO: O locatário não poderá transferir este contrato, ceder, emprestar, ou sublocar o imóvel no todo ou em parte, sem prévia autorização por escrito do locador.`,
+    `XI. DESPESAS DE CONDOMÍNIO, CONSUMO E TAXAS: Todas as despesas decorrentes da locação, quais sejam, consumo de água, luz, telefone e gás, ficam a cargo do locatário, cabendo-lhe efetuar diretamente esses pagamentos nas devidas épocas. O valor será acordado entre taxa mínima ou medição, de acordo com o nível do consumo.`,
+    `XII. VISTORIA: O locatário desde já faculta ao locador examinar ou vistoriar o prédio, sempre que o segundo entender conveniente, desde que previamente acordados dia e hora.`,
+    `XIII. DEVOLUÇÃO DO IMÓVEL: É de responsabilidade do locatário a devolução do imóvel em boas condições, sem danos ao piso, paredes e instalações. Em caso de entrega com dano carente de reforma em que o locatário falhe em reparar por conta própria, será contratado um prestador de serviços terceiro, com valor a ser pago pelo locatário.`,
+    `XIV. FORO: Para todas as questões decorrentes deste contrato, será competente o foro da situação do imóvel, seja qual for o domicílio dos contratantes.`,
+    `E, por estarem, assim ajustados, assinam o presente contrato.`,
+  ];
+
+  // Bold clause numbers
+  for(const p of paragraphs){
+    const boldMatch = p.match(/^(I{1,3}V?|VI{0,3}|IX|XI{0,3}V?|XIV)\. /);
+    if(boldMatch){
+      const split = p.indexOf(". ") + 2;
+      const prefix = p.substring(0, split);
+      const rest = p.substring(split);
+      // Draw bold prefix then normal rest
+      const lines = doc.splitTextToSize(p, TW);
+      doc.setFont(FONT,"normal");
+      for(let i=0; i<lines.length; i++){
+        if(cY > PH - MB){ doc.addPage(); cY = MT; }
+        if(i===0){
+          // Bold the roman numeral part
+          const boldEnd = lines[0].indexOf(". ") + 2;
+          doc.setFont(FONT,"bold");
+          doc.text(lines[0].substring(0, boldEnd), ML, cY);
+          const boldW = doc.getTextWidth(lines[0].substring(0, boldEnd));
+          doc.setFont(FONT,"normal");
+          doc.text(lines[0].substring(boldEnd), ML + boldW, cY);
+        } else {
+          doc.text(lines[i], ML, cY);
+        }
+        cY += LEAD;
+      }
+      cY += 7 - LEAD;
+    } else {
+      addText(p, {after:7});
+    }
+  }
+
+  // Fundão — 3 lines space then centered
+  cY += 3 * LEAD;
+  addText(`Fundão, ${dataAssinatura}.`, {align:"center", after:0});
+
+  // First signature — 5 lines below
+  cY += 5 * LEAD;
+  const SIG = "_".repeat(48);
+  addText(SIG, {align:"center", after:3});
+  addText("Ian Felisberto Villefort", {align:"center", after:0});
+
+  // Second signature — 5 lines below
+  cY += 5 * LEAD;
+  addText(SIG, {align:"center", after:3});
+  addText(f.nome, {align:"center", after:0});
+
+  // Output
+  const pdfBlob = doc.output("blob");
+  const isMobile = ('ontouchstart' in window) || navigator.maxTouchPoints > 0;
+
+  if(isMobile && navigator.share && navigator.canShare){
+    try{
+      const file = new File([pdfBlob], `Contrato_${f.nome.split(" ")[0]}.pdf`, {type:"application/pdf"});
+      if(navigator.canShare({files:[file]})){
+        await navigator.share({files:[file], title:"Contrato de Locação"});
+        toast("✅ Contrato gerado!");
+        return;
+      }
+    }catch(e){}
+  }
+  const url = URL.createObjectURL(pdfBlob);
+  const a = document.createElement("a");
+  a.href = url;
+  a.download = `Contrato_${f.nome.split(" ")[0]}.pdf`;
+  document.body.appendChild(a);
+  a.click();
+  document.body.removeChild(a);
+  setTimeout(()=>URL.revokeObjectURL(url), 1000);
+  toast("✅ Contrato gerado!");
+}
+
 // ── ALUGUEL ────────────────────────────────────────────────────────────────
+function toggleRentalText(){
+  const full = document.getElementById("rental-full-text");
+  const preview = document.getElementById("rental-preview");
+  const btn = document.getElementById("rental-toggle-btn");
+  const expanded = full.style.display !== "none";
+  full.style.display = expanded ? "none" : "block";
+  preview.style.display = expanded ? "" : "none";
+  btn.textContent = expanded ? "▼ Expandir" : "▲ Recolher";
+}
+
+function formatCEP(input){
+  let v = input.value.replace(/\D/g,"");
+  if(v.length > 5) v = v.slice(0,5)+"-"+v.slice(5,8);
+  input.value = v;
+}
+
+async function buscarCEP(){
+  const cep = document.getElementById("ct-cep").value.replace(/\D/g,"");
+  const status = document.getElementById("cep-status");
+  const btn = document.getElementById("cep-btn");
+  if(cep.length !== 8){ status.textContent=""; return; }
+  status.textContent="🔍 Buscando..."; status.style.color="#808080";
+  btn.disabled=true;
+  try{
+    const res = await fetch(`https://viacep.com.br/ws/${cep}/json/`);
+    const data = await res.json();
+    if(data.erro){
+      status.textContent="❌ CEP não encontrado"; status.style.color="#e74c3c";
+    } else {
+      document.getElementById("ct-rua").value = data.logradouro || "";
+      document.getElementById("ct-bairro").value = data.bairro || "";
+      document.getElementById("ct-cidade").value = data.localidade || "";
+      document.getElementById("ct-estado").value = data.uf || "";
+      status.textContent="✅ Endereço preenchido — confira e edite se necessário";
+      status.style.color="#2ecc71";
+      // Focus on number field
+      setTimeout(()=>document.getElementById("ct-numend").focus(), 100);
+    }
+  }catch(e){
+    status.textContent="❌ Erro ao buscar CEP"; status.style.color="#e74c3c";
+  }
+  btn.disabled=false;
+}
 const RENTAL_TEXT = `Análise de locação
 
 Para darmos andamento na análise do aluguel, envie os seguintes documentos:
@@ -1807,17 +2086,17 @@ async function generateRentalPDF(){
     const margin = 22;
     const pageW = 210;
     const maxW = pageW - margin * 2;
-    let y = 28;
+    let ry = 28;
 
     // ── Header ──
     doc.setFont("helvetica","bold");
     doc.setFontSize(18);
-    doc.text("Análise de Locação", pageW/2, y, {align:"center"});
-    y += 8;
+    doc.text("Análise de Locação", pageW/2, ry, {align:"center"});
+    ry += 8;
     doc.setDrawColor(80,80,80);
     doc.setLineWidth(0.5);
-    doc.line(margin, y, pageW-margin, y);
-    y += 12;
+    doc.line(margin, ry, pageW-margin, ry);
+    ry += 12;
 
     // ── Intro ──
     doc.setFont("helvetica","normal");
@@ -1827,8 +2106,8 @@ async function generateRentalPDF(){
       "Para darmos andamento na análise do aluguel, envie os seguintes documentos:",
       maxW
     );
-    doc.text(intro, margin, y);
-    y += intro.length * 6 + 8;
+    doc.text(intro, margin, ry);
+    ry += intro.length * 6 + 8;
 
     // ── Items ──
     const items = [
@@ -1870,46 +2149,46 @@ async function generateRentalPDF(){
       // Number + bold title
       doc.setFont("helvetica","bold");
       doc.setFontSize(11);
-      doc.text(item.num, margin, y);
-      doc.text(item.title, margin + 8, y);
-      y += 6;
+      doc.text(item.num, margin, ry);
+      doc.text(item.title, margin + 8, ry);
+      ry += 6;
 
       // Body text
       doc.setFont("helvetica","normal");
       doc.setFontSize(10);
       doc.setTextColor(60,60,60);
       const bodyLines = doc.splitTextToSize(item.body, maxW - 8);
-      doc.text(bodyLines, margin + 8, y);
-      y += bodyLines.length * 5;
+      doc.text(bodyLines, margin + 8, ry);
+      ry += bodyLines.length * 5;
 
       // Links
       if(item.links){
         for(const link of item.links){
           if(y > 270){ doc.addPage(); y = 22; }
-          y += 3;
+          ry += 3;
           doc.setFont("helvetica","normal");
           doc.setFontSize(9);
           doc.setTextColor(60,60,60);
-          doc.text(link.label, margin + 10, y);
+          doc.text(link.label, margin + 10, ry);
           const labelW = doc.getTextWidth(link.label + " ");
           doc.setTextColor(0,80,180);
-          doc.textWithLink(link.url, margin + 10 + labelW + 1, y, {url: link.url});
+          doc.textWithLink(link.url, margin + 10 + labelW + 1, ry, {url: link.url});
           doc.setTextColor(60,60,60);
-          y += 5;
+          ry += 5;
         }
       }
-      y += 6;
+      ry += 6;
     }
 
     // ── Footer line ──
     doc.setDrawColor(180,180,180);
     doc.setLineWidth(0.3);
-    doc.line(margin, y, pageW-margin, y);
-    y += 7;
+    doc.line(margin, ry, pageW-margin, ry);
+    ry += 7;
     doc.setFont("helvetica","italic");
     doc.setFontSize(10);
     doc.setTextColor(100,100,100);
-    doc.text("Assim que receber toda a documentação, encaminharei para análise e retornarei em até 7 dias.", margin, y, {maxWidth: maxW});
+    doc.text("Assim que receber toda a documentação, encaminharei para análise e retornarei em até 7 dias.", margin, ry, {maxWidth: maxW});
 
     // ── Generate blob and open share dialog on mobile, download on desktop ──
     const pdfBlob = doc.output("blob");
