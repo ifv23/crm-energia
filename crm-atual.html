@@ -8,6 +8,7 @@
 <meta http-equiv="Expires" content="0"/>
 <title>EnergiaCRM</title>
 <script src="https://accounts.google.com/gsi/client" async></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js"></script>
 <link href="https://fonts.googleapis.com/css2?family=Segoe+UI:wght@400;600;700&family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet"/>
@@ -248,6 +249,7 @@ tr:active td{background:#2a2a2a;}
   <button class="nb" onclick="goTab('charges',this)">💰 Cobranças</button>
   <button class="nb" onclick="goTab('tenants',this)">👥 Inquilinos</button>
   <button class="nb" onclick="goTab('history',this)">📊 Histórico</button>
+  <button class="nb" onclick="goTab('rental',this)">🏠 Aluguel</button>
   <button class="nb" onclick="goTab('settings',this)">⚙️ Config</button>
 </nav>
 
@@ -369,6 +371,36 @@ tr:active td{background:#2a2a2a;}
 </div>
 
 <!-- CONFIG -->
+<!-- ALUGUEL -->
+<div class="pg" id="pg-rental">
+  <div class="card">
+    <div class="ct">🏠 Análise de locação</div>
+    <div style="background:#1a1a1a;border-radius:3px;padding:14px;font-size:13px;color:#b0b0b0;line-height:1.8;white-space:pre-wrap;margin-bottom:12px;">Análise de locação
+
+Para darmos andamento na análise do aluguel, preciso dos seguintes documentos:
+
+1. *RG e CPF* — documento com foto e CPF visível
+2. *Comprovante de renda* — 3 últimos holerites ou declaração de IR. A renda precisa ser no mínimo 3x o valor do aluguel + condomínio
+3. *Comprovante de residência atual* — conta de luz ou água recente (últimos 3 meses)
+4. *Certidões negativas* — gratuitas e online, levam menos de 10 minutos (padrão exigido pelas imobiliárias):
+   - PF: https://antecedentes.dpf.gov.br/antecedentes-criminais/certidao
+   - SSP-ES: https://ssp.sesp.es.gov.br/antecedente
+   - TJES: https://sistemas.tjes.jus.br/certidaonegativa/
+5. *2 referências profissionais* — nome e telefone de pessoas que possam falar do seu trabalho
+
+Assim que receber toda a documentação, encaminho para análise e retorno em até 7 dias.</div>
+    <div style="display:flex;gap:8px;margin-top:0">
+      <button class="btn bp" style="flex:1;justify-content:center" onclick="copyRentalText()">
+        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="9" y="9" width="13" height="13" rx="2"/><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/></svg>
+        Copiar texto
+      </button>
+      <button class="btn bg" style="flex:1;justify-content:center" onclick="generateRentalPDF()">
+        📄 Gerar PDF
+      </button>
+    </div>
+  </div>
+</div>
+
 <div class="pg" id="pg-settings">
   <div class="card">
     <div class="ct">🔑 Chave API Anthropic</div>
