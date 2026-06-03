@@ -1880,78 +1880,90 @@ async function generateContractPDF(){
     const dataAssinatura = String(hoje.getDate()).padStart(2,"0")+" de "+meses[hoje.getMonth()]+" de "+hoje.getFullYear();
 
     const { jsPDF } = window.jspdf;
-    // Use mm units — more predictable across devices
     const doc = new jsPDF({orientation:"portrait", unit:"mm", format:"a4"});
 
     const PW = 210, PH = 297;
     const ML = 22, MR = 22, MT = 22, MB = 22;
-    const TW = PW - ML - MR;  // 166mm
+    const TW = PW - ML - MR;
     const FS = 9.5;
-    const LEAD = 4.8;  // ~13pt in mm (1pt = 0.353mm, 13pt = 4.59mm)
+    const LEAD = 4.8;
 
     doc.setFont("helvetica","normal");
     doc.setFontSize(FS);
-
     let cy = MT;
 
-    function newPageIfNeeded(extraLines){
-      if(cy + (extraLines * LEAD) > PH - MB){
-        doc.addPage();
-        cy = MT;
-      }
+    function newPageIfNeeded(h){
+      if(cy + h > PH - MB){ doc.addPage(); cy = MT; }
     }
 
-    function addParagraph(text, options={}){
-      const bold = options.bold || false;
-      const align = options.align || "left";
-      const after = options.after !== undefined ? options.after : LEAD;
-      doc.setFont("helvetica", bold ? "bold" : "normal");
-      doc.setFontSize(options.size || FS);
+    function drawParagraph(text, options={}){
+      const bold = options.bold||false;
+      const align = options.align||"left";
+      const after = options.after!==undefined ? options.after : LEAD;
+      const sz = options.size||FS;
+      doc.setFont("helvetica", bold?"bold":"normal");
+      doc.setFontSize(sz);
       const lines = doc.splitTextToSize(text, TW);
-      lines.forEach((line, i) => {
-        newPageIfNeeded(1);
-        const isLast = i === lines.length - 1;
-        const textAlign = (align === "justify" && !isLast) ? "justify" : (align === "justify" ? "left" : align);
-        doc.text(line, align === "center" ? PW/2 : ML, cy, {align: textAlign, maxWidth: TW});
+      lines.forEach(line => {
+        newPageIfNeeded(LEAD);
+        if(align==="center"){
+          doc.text(line, PW/2, cy, {align:"center"});
+        } else {
+          doc.text(line, ML, cy);
+        }
         cy += LEAD;
       });
       cy += after;
     }
 
-    function addClause(roman, rest){
+    function drawClause(roman, text){
       const prefix = roman + ": ";
-      // Split only the body text, render prefix separately on first line
-      const firstLineAvail = TW - doc.getTextWidth(prefix);
-      const bodyLines = doc.splitTextToSize(rest, TW);
-      // Rebuild: first line starts after prefix
-      const allLines = doc.splitTextToSize(prefix + rest, TW);
-      allLines.forEach((line, i) => {
-        newPageIfNeeded(1);
+      const boldW = doc.getTextWidth(prefix);
+      const lines = doc.splitTextToSize(prefix + text, TW);
+      lines.forEach((line, i) => {
+        newPageIfNeeded(LEAD);
         if(i === 0){
-          // Draw bold prefix, then normal rest — no overlap
           doc.setFont("helvetica","bold");
           doc.text(prefix, ML, cy);
-          const boldW = doc.getTextWidth(prefix);
           doc.setFont("helvetica","normal");
-          // Get the portion of this line after the prefix
-          const lineWithoutPrefix = line.startsWith(prefix) ? line.slice(prefix.length) : line.slice(prefix.trimEnd().length);
-          if(lineWithoutPrefix.trim()) doc.text(lineWithoutPrefix, ML + boldW, cy);
+          const rest = line.startsWith(prefix) ? line.slice(prefix.length) : line.slice(prefix.trimEnd().length);
+          if(rest.trim()) doc.text(rest, ML + boldW, cy);
         } else {
           doc.setFont("helvetica","normal");
           doc.text(line, ML, cy);
         }
         cy += LEAD;
       });
-      cy += LEAD * 0.5;
+      cy += LEAD * 0.4;
+    }
+
+    function drawSignature(name){
+      newPageIfNeeded(35);
+      // Dashed box 84mm wide x 14mm tall (70% of original)
+      const boxW = 84, boxH = 14;
+      const boxX = ML + (TW - boxW) / 2;
+      doc.setLineDashPattern([2, 1.5], 0);
+      doc.setLineWidth(0.3);
+      doc.rect(boxX, cy, boxW, boxH);
+      doc.setLineDashPattern([], 0);
+      cy += boxH + 1.5;
+      // Signature line
+      const sig = "_".repeat(48);
+      doc.setFont("helvetica","normal");
+      doc.setFontSize(FS);
+      doc.text(sig, PW/2, cy, {align:"center"});
+      cy += LEAD;
+      doc.text(name, PW/2, cy, {align:"center"});
+      cy += LEAD;
     }
 
     // Title
-    addParagraph("Contrato de Locação não residencial", {bold:true, align:"center", size:11, after:LEAD*1.2});
+    drawParagraph("Contrato de Locação não residencial", {bold:true, align:"center", size:11, after:LEAD*0.8});
 
-    // Intro paragraph
-    addParagraph(
+    // Intro
+    drawParagraph(
       `Pelo presente instrumento particular, de um lado, como LOCADOR, Ian Felisberto Villefort, CPF/RG 152.495.727-58, brasileiro, solteiro, analista comercial, residente e domiciliado no endereço Rodovia Santa Cruz, 615, Praia Grande, Fundão - ES e, de outro lado, como LOCATÁRIO, ${f.nome}, ${f.nac}, ${f.ecivil}, ${f.prof}, RG ${f.rg}, inscrito sob o CPF ${f.cpf}, residente e domiciliado em ${f.rua}, ${f.numend}, ${f.bairro} - ${f.cidade} ${f.estado} - CEP ${f.cep}, resolvem celebrar o presente contrato de locação, o qual reger-se-á pelas seguintes cláusulas e condições:`,
-      {align:"justify", after:LEAD*0.8}
+      {after:LEAD*1.0}
     );
 
     const clauses = [
@@ -1971,21 +1983,14 @@ async function generateContractPDF(){
       ["XIV. FORO", `Para todas as questões decorrentes deste contrato, será competente o foro da situação do imóvel, seja qual for o domicílio dos contratantes.`],
     ];
 
-    clauses.forEach(([roman, text]) => {
-      addClause(roman, text);
-    });
+    clauses.forEach(([roman, text]) => drawClause(roman, text));
 
-    addParagraph("E, por estarem, assim ajustados, assinam o presente contrato.", {align:"justify", after:LEAD*3});
+    drawParagraph("E, por estarem, assim ajustados, assinam o presente contrato.", {after:LEAD*3});
+    drawParagraph(`Fundão, ${dataAssinatura}.`, {align:"center", after:LEAD*5});
 
-    // Date — centered
-    addParagraph(`Fundão, ${dataAssinatura}.`, {align:"center", after:LEAD*5});
-
-    // Signatures
-    const SIG = "_".repeat(48);
-    addParagraph(SIG, {align:"center", after:LEAD*0.5});
-    addParagraph("Ian Felisberto Villefort", {align:"center", after:LEAD*5});
-    addParagraph(SIG, {align:"center", after:LEAD*0.5});
-    addParagraph(f.nome, {align:"center", after:0});
+    drawSignature("Ian Felisberto Villefort");
+    cy += LEAD * 5;
+    drawSignature(f.nome);
 
     // Output
     const pdfBlob = doc.output("blob");
