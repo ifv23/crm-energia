@@ -1919,19 +1919,25 @@ async function generateContractPDF(){
     }
 
     function addClause(roman, rest){
-      const prefix = roman + ". ";
-      const lines = doc.splitTextToSize(prefix + rest, TW);
-      lines.forEach((line, i) => {
+      const prefix = roman + ": ";
+      // Split only the body text, render prefix separately on first line
+      const firstLineAvail = TW - doc.getTextWidth(prefix);
+      const bodyLines = doc.splitTextToSize(rest, TW);
+      // Rebuild: first line starts after prefix
+      const allLines = doc.splitTextToSize(prefix + rest, TW);
+      allLines.forEach((line, i) => {
         newPageIfNeeded(1);
         if(i === 0){
-          // Bold the roman numeral
-          const boldW = doc.getTextWidth(prefix);
+          // Draw bold prefix, then normal rest — no overlap
           doc.setFont("helvetica","bold");
           doc.text(prefix, ML, cy);
+          const boldW = doc.getTextWidth(prefix);
           doc.setFont("helvetica","normal");
-          const restOfLine = line.slice(prefix.length);
-          if(restOfLine) doc.text(restOfLine, ML + boldW, cy);
+          // Get the portion of this line after the prefix
+          const lineWithoutPrefix = line.startsWith(prefix) ? line.slice(prefix.length) : line.slice(prefix.trimEnd().length);
+          if(lineWithoutPrefix.trim()) doc.text(lineWithoutPrefix, ML + boldW, cy);
         } else {
+          doc.setFont("helvetica","normal");
           doc.text(line, ML, cy);
         }
         cy += LEAD;
