@@ -11,205 +11,269 @@
 <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js"></script>
-<link href="https://fonts.googleapis.com/css2?family=Segoe+UI:wght@400;600;700&family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500&display=swap" rel="stylesheet"/>
 <style>
+/* ── DARK MODE VARS (padrão) ── */
 :root{
-  --bg:#1e1e1e;
-  --sur:#2d2d2d;
-  --sur2:#363636;
-  --bor:#404040;
-  --bor2:#505050;
-  --acc:#217346;
-  --acc2:#1a5c38;
-  --acc3:#2ecc71;
-  --text:#d4d4d4;
-  --text2:#b0b0b0;
-  --mut:#808080;
-  --grn:#2ecc71;
-  --grn2:#27ae60;
-  --red:#e74c3c;
-  --blue:#3498db;
-  --hdr:#323232;
+  --bg:#1c1c1c;--sur:#222;--sur2:#2a2a2a;--bor:#2e2e2e;--bor2:#383838;
+  --text:#e0e0e0;--text2:#aaa;--mut:#555;
+  --grn:#4a9a6a;--red:#b0403a;--hdr:#222;
+  --dot-ok:#4a9a6a;--dot-miss:#7a6030;
+  --acc:#e8740c;
 }
+/* ── LIGHT MODE ── */
+body.light-mode{
+  --bg:#f5f5f3;--sur:#fff;--sur2:#f0efed;--bor:#e0dedd;--bor2:#ccc;
+  --text:#1a1a1a;--text2:#555;--mut:#999;
+  --grn:#2e7d4f;--red:#c0392b;--hdr:#fff;
+  --dot-ok:#2e7d4f;--dot-miss:#a07030;
+}
+
 *{box-sizing:border-box;margin:0;padding:0;}
-body{font-family:'Inter','Segoe UI',sans-serif;background:var(--bg);color:#d4d4d4;min-height:100vh;font-size:13px;}
-
-/* ── MOBILE-FIRST LAYOUT ── */
+body{font-family:'Inter',sans-serif;background:var(--bg);color:var(--text);min-height:100vh;font-size:13px;font-weight:400;overflow-x:hidden;}
+.main{max-width:700px;margin:0 auto;padding:12px 12px 24px;overflow-x:hidden;}
+/* ── HEADER ── */
 .hdr{
-  background:var(--hdr);border-bottom:1px solid #1a1a1a;
-  padding:0 12px;display:flex;align-items:center;gap:8px;
-  position:sticky;top:0;z-index:50;height:46px;
-  overflow:hidden;
+  background:var(--hdr);border-bottom:1px solid var(--bor);
+  padding:0 12px;display:flex;align-items:center;gap:10px;
+  position:sticky;top:0;z-index:50;height:46px;overflow:hidden;
 }
-.logo{width:28px;height:28px;border-radius:3px;background:var(--acc);display:flex;align-items:center;justify-content:center;font-size:14px;flex-shrink:0;}
+.logo{width:26px;height:26px;border-radius:7px;background:#1a1a1a;border:1px solid #333;display:flex;align-items:center;justify-content:center;flex-shrink:0;}
+.logo svg{display:block;}
+.logo-bolt{fill:#fff;stroke:#fff;}
+body.light-mode .logo{background:#e8e8e8;border-color:#ccc;}
+body.light-mode .logo-bolt{fill:#333;stroke:#333;}
 .brand{padding:0;flex-shrink:0;}
-.bn{font-size:13px;font-weight:700;color:#fff;line-height:1;}
-.bs{font-size:9px;color:#808080;margin-top:1px;}
+.bn{font-size:13px;font-weight:500;color:var(--text);line-height:1;}
+.bs{display:none;}
 
-/* NAV — bottom bar on mobile, top on desktop */
-.nav{display:flex;gap:0;overflow-x:auto;-webkit-overflow-scrolling:touch;scrollbar-width:none;background:var(--hdr);border-bottom:1px solid #1a1a1a;}
+/* Month nav in header */
+.hdr-month{display:flex;align-items:center;gap:6px;margin-left:auto;}
+.hdr-month-btn{
+  width:26px;height:26px;border-radius:4px;
+  border:1px solid var(--bor2);background:transparent;
+  color:var(--text2);cursor:pointer;display:flex;align-items:center;justify-content:center;
+  -webkit-tap-highlight-color:transparent;flex-shrink:0;
+}
+.hdr-month-btn:active{background:var(--sur2);}
+#month-label{font-size:12px;font-weight:400;color:var(--text2);min-width:72px;text-align:center;}
+
+/* ── NAV ── */
+.nav{display:flex;gap:0;overflow-x:auto;-webkit-overflow-scrolling:touch;scrollbar-width:none;background:var(--hdr);border-bottom:1px solid var(--bor);}
 .nav::-webkit-scrollbar{display:none;}
-.nb{flex:0 0 auto;padding:11px 14px;border-radius:0;border:none;border-bottom:3px solid transparent;
-  cursor:pointer;font-size:12px;font-weight:500;
-  font-family:'Inter','Segoe UI',sans-serif;
-  background:transparent;color:#888;
-  transition:all .1s;white-space:nowrap;
+.nb{
+  flex:0 0 auto;padding:11px 14px;border-radius:0;border:none;
+  border-bottom:2px solid transparent;
+  cursor:pointer;font-size:12px;font-weight:400;
+  font-family:'Inter',sans-serif;
+  background:transparent;color:var(--mut);
+  transition:color .1s,border-color .1s;white-space:nowrap;
   -webkit-tap-highlight-color:transparent;min-height:44px;
 }
-.nb.on{color:#2ecc71;border-bottom:3px solid #2ecc71;background:#1a1a1a;}
-.nb:active{background:#2a2a2a;}
+.nb.on{color:var(--text);border-bottom:2px solid var(--text);font-weight:500;}
+.nb:active{background:var(--sur2);}
 
-/* MAIN */
-.main{max-width:700px;margin:0 auto;padding:12px 12px 24px;}
+/* ── MAIN ── */
 .pg{display:none;}.pg.on{display:block;}
 
-/* CARDS */
-.card{background:#2d2d2d;border:1px solid #404040;border-radius:4px;padding:14px;margin-bottom:10px;}
-.ct{font-size:10px;font-weight:600;color:#808080;text-transform:uppercase;letter-spacing:1px;margin-bottom:10px;}
+/* ── CARDS ── */
+.card{background:var(--sur);border:1px solid var(--bor);border-radius:8px;padding:14px;margin-bottom:10px;}
+.ct{font-size:10px;font-weight:500;color:var(--mut);text-transform:uppercase;letter-spacing:.8px;margin-bottom:10px;}
 
-/* STATS */
+/* ── STATS ── */
 .stats{display:grid;grid-template-columns:repeat(2,1fr);gap:8px;margin-bottom:10px;}
-.sv{font-size:18px;font-weight:700;color:var(--acc3);}
-.sl{font-size:10px;color:#808080;margin-top:2px;}
+.sv{font-size:18px;font-weight:500;color:var(--text);}
+.sl{font-size:10px;color:var(--mut);margin-top:2px;}
 
-/* BUTTONS */
+/* ── BUTTONS ── */
 .btn{
   display:inline-flex;align-items:center;gap:5px;
-  padding:8px 14px;border-radius:3px;border:1px solid transparent;
-  cursor:pointer;font-size:12px;font-weight:500;
-  font-family:'Inter','Segoe UI',sans-serif;transition:all .1s;
+  padding:8px 14px;border-radius:6px;border:1px solid transparent;
+  cursor:pointer;font-size:12px;font-weight:400;
+  font-family:'Inter',sans-serif;transition:opacity .1s;
   -webkit-tap-highlight-color:transparent;
 }
 .btn:disabled{opacity:.4;cursor:not-allowed;}
-.bp{background:var(--acc);color:#fff;border-color:var(--acc2);}
-.bp:active{background:var(--acc2);}
-.bg{background:#363636;color:#d4d4d4;border-color:#505050;}
-.bg:active{background:#444;}
-.bg2{background:#1e6e3a;color:#fff;border-color:#165730;}
-.bg2:active{background:var(--grn2);}
+/* primary = light fill */
+.bp{background:var(--text);color:var(--bg);border-color:var(--text);}
+.bp:active{opacity:.8;}
+/* secondary = dark fill */
+.bg{background:var(--sur2);color:var(--text);border:1px solid var(--bor2);}
+.bg:active{opacity:.7;}
+/* success accent (keep for GitHub publish) */
+.bg2{background:var(--sur2);color:var(--grn);border:1px solid var(--bor2);}
+.bg2:active{opacity:.7;}
 .bs2{padding:6px 10px;font-size:11px;}
 .btn-full{width:100%;justify-content:center;}
 
-/* FIELDS */
-.fl{font-size:11px;color:#808080;text-transform:uppercase;letter-spacing:.5px;margin-bottom:4px;}
+/* ── FIELDS ── */
+.fl{font-size:11px;color:var(--mut);text-transform:uppercase;letter-spacing:.5px;margin-bottom:4px;}
 input[type=text],input[type=number],input[type=password]{
-  width:100%;padding:9px 10px;border-radius:3px;
-  border:1px solid #505050;background:#1a1a1a;
-  color:#d4d4d4;font-size:16px;
-  font-family:'Inter','Segoe UI',sans-serif;
+  width:100%;padding:9px 10px;border-radius:6px;
+  border:1px solid var(--bor2);background:var(--sur2);
+  color:var(--text);font-size:16px;
+  font-family:'Inter',sans-serif;
   outline:none;transition:border-color .1s;
   -webkit-appearance:none;
 }
 @media(min-width:640px){
-  input[type=text],input[type=number],input[type=password]{
-    font-size:13px;
-  }
+  input[type=text],input[type=number],input[type=password]{font-size:13px;}
 }
-input:focus{border-color:#217346;}
+input:focus{border-color:var(--text2);}
 
-/* UPLOAD */
+/* ── UPLOAD ── */
 .uz{
   display:flex;align-items:center;justify-content:center;gap:8px;
-  padding:12px 16px;border:1px dashed #505050;border-radius:3px;
-  cursor:pointer;font-size:13px;font-weight:500;color:#808080;
+  padding:12px 16px;border:1px dashed var(--bor2);border-radius:6px;
+  cursor:pointer;font-size:13px;font-weight:400;color:var(--mut);
   transition:all .15s;width:100%;min-height:48px;
 }
-.uz:active{border-color:#2ecc71;color:#2ecc71;}
+.uz:active{border-color:var(--text2);}
 
-/* BADGES */
-.badge{display:inline-block;padding:2px 8px;border-radius:3px;font-size:11px;font-weight:600;}
-.bp0{background:#3d2e00;color:#f0a500;}
-.bc{background:#00252e;color:#3db8d4;}
-.ba{background:#0d2b0d;color:#4caf50;}
-.bs0{background:#2a2a2a;color:#888;}
+/* ── BADGES ── */
+.badge{display:inline-block;padding:2px 8px;border-radius:4px;font-size:11px;font-weight:500;}
+.bp0{background:rgba(122,96,48,.15);color:#a07840;}
+.bc{background:rgba(60,140,180,.12);color:#6aaccc;}
+.ba{background:rgba(74,154,106,.12);color:#4a9a6a;}
+.bs0{background:var(--sur2);color:var(--mut);}
 
-/* TABLES — scroll horizontally only if needed, min col widths */
+/* ── TABLES ── */
 table{width:100%;border-collapse:collapse;}
-th{padding:8px 8px;text-align:left;font-size:10px;font-weight:600;color:#808080;text-transform:uppercase;letter-spacing:.5px;border-bottom:1px solid #404040;background:#252525;}
-td{padding:9px 8px;font-size:12px;border-bottom:1px solid #333;vertical-align:middle;}
-tr:active td{background:#2a2a2a;}
+th{padding:8px 8px;text-align:left;font-size:10px;font-weight:500;color:var(--mut);text-transform:uppercase;letter-spacing:.5px;border-bottom:1px solid var(--bor);background:var(--sur);}
+td{padding:9px 8px;font-size:12px;border-bottom:1px solid var(--bor);vertical-align:middle;color:var(--text);}
+tr:active td{background:var(--sur2);}
 .tw{overflow-x:auto;-webkit-overflow-scrolling:touch;}
 
-/* MODAL */
+/* ── MODAL ── */
 .mb{display:none;position:fixed;inset:0;background:#0009;z-index:200;align-items:flex-end;justify-content:center;padding:0;}
 .mb.on{display:flex;}
 .md{
-  background:#2d2d2d;border:1px solid #505050;
-  border-radius:8px 8px 0 0;
+  background:var(--sur);border:1px solid var(--bor2);
+  border-radius:12px 12px 0 0;
   padding:20px 16px 32px;
   width:100%;max-width:500px;
   max-height:92vh;overflow-y:auto;
   box-shadow:0 -4px 24px #0008;
-  touch-action:pan-y;
-  will-change:transform;
+  touch-action:pan-y;will-change:transform;
 }
-.md h3{font-size:15px;font-weight:700;color:#fff;margin-bottom:5px;}
-.msub{font-size:12px;color:#808080;margin-bottom:16px;line-height:1.5;}
-/* Drag handle */
-.md::before{content:'';display:block;width:36px;height:4px;background:#505050;border-radius:2px;margin:0 auto 16px;}
+.md h3{font-size:14px;font-weight:500;color:var(--text);margin-bottom:5px;}
+.msub{font-size:12px;color:var(--text2);margin-bottom:16px;line-height:1.5;}
+.md::before{content:'';display:block;width:36px;height:4px;background:var(--bor2);border-radius:2px;margin:0 auto 16px;}
 
-/* TOAST */
-#toast{position:fixed;top:12px;left:12px;right:12px;z-index:999;padding:12px 14px;border-radius:4px;font-weight:600;font-size:13px;box-shadow:0 4px 16px #000A;display:none;border-left:3px solid;text-align:center;}
-#toast.ok{background:#1a3a1a;color:#fff;border-color:#2ecc71;}
-#toast.er{background:#3a1a1a;color:#fff;border-color:#e74c3c;}
+/* ── TOAST ── */
+#toast{position:fixed;top:12px;left:12px;right:12px;z-index:999;padding:12px 14px;border-radius:8px;font-weight:500;font-size:13px;box-shadow:0 4px 16px #000A;display:none;border-left:3px solid;text-align:center;}
+#toast.ok{background:var(--sur);color:var(--text);border-color:var(--grn);}
+#toast.er{background:var(--sur);color:var(--text);border-color:var(--red);}
 
-/* SPINNER */
-.spin{display:inline-block;width:12px;height:12px;border:2px solid #fff3;border-top-color:#fff;border-radius:50%;animation:sp .7s linear infinite;}
+/* ── SPINNER ── */
+.spin{display:inline-block;width:12px;height:12px;border:2px solid rgba(255,255,255,.2);border-top-color:var(--text);border-radius:50%;animation:sp .7s linear infinite;}
 @keyframes sp{to{transform:rotate(360deg);}}
 
-/* INFO BOX */
-.ib{background:#1a1a1a;border-radius:3px;padding:10px 12px;font-size:12px;color:#808080;line-height:1.7;border-left:3px solid #217346;}
+/* ── INFO BOX ── */
+.ib{background:var(--sur2);border-radius:6px;padding:10px 12px;font-size:12px;color:var(--text2);line-height:1.7;border-left:3px solid var(--bor2);}
 .row{display:flex;gap:8px;align-items:flex-end;flex-wrap:wrap;}
 .f1{flex:1;min-width:120px;}
 
-/* API BANNER */
-#apib{background:#1e2a1e;border:1px solid #2d4a2d;border-radius:3px;padding:12px 14px;margin-bottom:10px;display:flex;align-items:flex-start;gap:8px;flex-wrap:wrap;}
-#apib p{font-size:12px;color:#7ec89e;flex:1;line-height:1.5;min-width:200px;}
+/* ── API BANNER ── */
 
-/* DRIVE BAR */
-#drive-bar{background:#252525;border-bottom:1px solid #333;padding:5px 12px;display:flex;align-items:center;gap:8px;font-size:11px;color:#808080;flex-wrap:wrap;}
+/* ── DRIVE BAR ── */
+#drive-bar{background:var(--sur);border-bottom:1px solid var(--bor);padding:5px 12px;display:flex;align-items:center;gap:8px;font-size:11px;color:var(--text2);flex-wrap:wrap;}
 #drive-status{display:flex;align-items:center;gap:6px;flex:1;min-width:140px;}
-#drive-dot{width:7px;height:7px;border-radius:50%;background:#555;flex-shrink:0;}
-#drive-dot.ok{background:#2ecc71;}
-#drive-dot.err{background:#e74c3c;}
-#drive-dot.sync{background:#f0a500;animation:pulse .8s infinite alternate;}
+#drive-dot{width:7px;height:7px;border-radius:50%;background:var(--mut);flex-shrink:0;}
+#drive-dot.ok{background:var(--grn);}
+#drive-dot.err{background:var(--red);}
+#drive-dot.sync{background:#a07840;animation:pulse .8s infinite alternate;}
 @keyframes pulse{to{opacity:.3;}}
 
-/* MONTH NAV */
-.month-nav{display:flex;align-items:center;gap:6px;margin-left:auto;}
-.month-nav button{background:#3a3a3a;border:1px solid #505050;border-radius:3px;color:#d4d4d4;width:28px;height:28px;cursor:pointer;font-size:14px;display:flex;align-items:center;justify-content:center;-webkit-tap-highlight-color:transparent;}
-.month-nav button:active{background:#4a4a4a;}
-#month-label{font-size:11px;font-weight:600;color:#fff;min-width:80px;text-align:center;}
+/* ── LEITURAS — rd-cards ── */
+.rd-card{background:var(--sur);border:1px solid var(--bor);border-radius:8px;padding:13px;margin-bottom:8px;}
+.rd-top{display:flex;justify-content:space-between;align-items:baseline;margin-bottom:10px;}
+.rd-name{font-size:13px;font-weight:500;color:var(--text);}
+.rd-unit{font-size:12px;color:var(--mut);}
+.rd-grid{display:grid;grid-template-columns:1fr 1fr 1fr;gap:6px;margin-bottom:11px;}
+.rd-lbl{font-size:10px;color:var(--mut);text-transform:uppercase;letter-spacing:.4px;margin-bottom:3px;display:flex;align-items:center;gap:4px;}
+.rd-dot{width:6px;height:6px;border-radius:50%;flex-shrink:0;}
+.rd-dot.ok{background:var(--dot-ok);}
+.rd-dot.miss{background:var(--dot-miss);}
+.rd-val{font-size:13px;font-weight:500;color:var(--text);}
+.rd-empty{font-size:12px;color:var(--mut);font-style:italic;}
+.rd-btns{display:flex;gap:6px;flex-wrap:wrap;}
 
-/* DESKTOP overrides */
-@media(min-width:640px){
-  .hdr{height:48px;padding:0 16px;}
-  .nav{border-bottom:1px solid #1a1a1a;}
-  .nb{padding:8px 14px;font-size:12px;}
-  .main{padding:16px 16px 16px;}
-  .mb{align-items:center;padding:16px;}
-  .md{border-radius:4px;padding:24px;max-height:85vh;}
-  .md::before{display:none;}
-  .stats{grid-template-columns:repeat(4,1fr);}
-  #toast{left:auto;right:14px;width:300px;text-align:left;}
+/* Upload cards em 2 colunas */
+.upload-grid{display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-bottom:12px;}
+.upload-card{
+  background:var(--sur);border:1px solid var(--bor);border-radius:8px;
+  padding:14px 10px;display:flex;flex-direction:column;align-items:center;
+  justify-content:center;gap:6px;cursor:pointer;min-height:72px;
+  -webkit-tap-highlight-color:transparent;
 }
+.upload-card:active{background:var(--sur2);}
+.upload-card-title{font-size:13px;font-weight:500;color:var(--text2);}
+.upload-card-sub{font-size:11px;color:var(--mut);}
 
+/* Mês label */
+.read-month-label{font-size:12px;color:var(--mut);margin-bottom:10px;}
+.read-month-label span{color:var(--text);font-weight:400;}
 
-/* PULL TO REFRESH */
+/* ── TOGGLE TEMA ── */
+.theme-toggle{display:flex;align-items:center;gap:10px;padding:4px 0;}
+.toggle-track{width:40px;height:22px;border-radius:11px;background:var(--bor2);position:relative;cursor:pointer;transition:background .2s;}
+.toggle-track.on{background:var(--text2);}
+.toggle-thumb{width:16px;height:16px;border-radius:50%;background:var(--text);position:absolute;top:3px;left:3px;transition:left .2s;}
+.toggle-track.on .toggle-thumb{left:21px;}
+.toggle-label{font-size:13px;color:var(--text2);}
+
+/* ── PTR ── */
 #ptr-indicator{
   position:fixed;top:0;left:0;right:0;z-index:300;
   display:flex;align-items:center;justify-content:center;gap:10px;
-  background:#217346;color:#fff;font-size:13px;font-weight:600;
+  background:var(--sur2);color:var(--text2);font-size:12px;font-weight:400;
   height:0;overflow:hidden;transition:height .2s;
 }
-#ptr-indicator.visible{height:48px;}
-#ptr-spinner{width:18px;height:18px;border:2px solid #fff4;border-top-color:#fff;border-radius:50%;}
+#ptr-indicator.visible{height:44px;}
+#ptr-spinner{width:16px;height:16px;border:2px solid rgba(255,255,255,.15);border-top-color:var(--text2);border-radius:50%;}
 #ptr-spinner.spin{animation:sp .7s linear infinite;}
-/* Utility */
+
+/* ── DESKTOP ── */
+@media(min-width:640px){
+  .hdr{height:48px;padding:0 16px;}
+  .nav{border-bottom:1px solid var(--bor);}
+  .nb{padding:8px 14px;font-size:12px;}
+  .main{padding:16px 16px 16px;}
+  .mb{align-items:center;padding:16px;}
+  .md{border-radius:8px;padding:24px;max-height:85vh;}
+  .md::before{display:none;}
+  .stats{grid-template-columns:repeat(3,1fr);}
+  #toast{left:auto;right:14px;width:300px;text-align:left;}
+}
+
+/* ── UTILITY ── */
 .gap-8{gap:8px;}
 .mt-8{margin-top:8px;}
 .mt-12{margin-top:12px;}
 .w-full{width:100%;}
+
+/* ── OVERRIDES para inline styles gerados por JS ── */
+[style*="color:#2ecc71"]{color:var(--grn)!important;}
+[style*="color:#808080"]{color:var(--mut)!important;}
+[style*="color:#d4d4d4"]{color:var(--text)!important;}
+[style*="color:#b0b0b0"]{color:var(--text2)!important;}
+[style*="color:#4caf50"]{color:var(--grn)!important;}
+[style*="color:#e74c3c"]{color:var(--red)!important;}
+[style*="color:#f0a500"]{color:var(--text2)!important;}
+[style*="color:#999"]{color:var(--mut)!important;}
+[style*="background:#1a1a1a"]{background:var(--sur2)!important;}
+[style*="background:#2d2d2d"]{background:var(--sur)!important;}
+[style*="background:#252525"]{background:var(--sur2)!important;}
+[style*="background:#333"]{background:var(--sur2)!important;}
+[style*="background:#0d2b0d"]{background:rgba(74,154,106,.12)!important;}
+[style*="background:#3A0A0A"]{background:rgba(176,64,58,.12)!important;}
+[style*="background:#2A2000"]{background:rgba(122,96,48,.12)!important;}
+[style*="border:1px solid #404040"]{border-color:var(--bor)!important;}
+[style*="border:1px solid #505050"]{border-color:var(--bor2)!important;}
+[style*="border-left:3px solid #217346"]{border-left-color:var(--bor2)!important;}
+[style*="font-weight:700"]{font-weight:500!important;}
+[style*="font-weight:600"]{font-weight:500!important;}
 </style>
 </head>
 <body>
@@ -230,7 +294,7 @@ tr:active td{background:#2a2a2a;}
     <button id="drive-reconnect-btn" class="btn bg bs2" onclick="driveLogin(false)" style="display:none;font-size:11px;padding:3px 10px;">🔄 Reconectar</button>
     <button id="drive-logout-btn" class="btn bg bs2" onclick="driveLogout()" style="display:none;font-size:11px;padding:3px 10px;">Desconectar</button>
     <button id="drive-refresh-btn" class="btn bg bs2" onclick="manualRefresh()" style="display:none;font-size:11px;padding:3px 10px;">🔄</button>
-    <button id="drive-check-edp-btn" class="btn bg bs2" onclick="checkEDPPendente()" style="display:none;font-size:11px;padding:3px 10px;background:#1e3a1e;color:#4caf50;border-color:#2d4a2d;">📧 Ver conta EDP</button>
+    <button id="drive-check-edp-btn" class="btn bg bs2" onclick="checkEDPPendente()" style="display:none;font-size:11px;padding:3px 10px;">📧 Ver conta EDP</button>
   </div>
 </div>
 
@@ -239,23 +303,30 @@ tr:active td{background:#2a2a2a;}
 
 <!-- HEADER -->
 <div class="hdr">
-  <div class="logo">⚡</div>
-  <div class="brand"><div class="bn">EnergiaCRM</div><div class="bs">Gestão de energia</div></div>
-  <div style="display:flex;align-items:center;gap:4px;margin-left:auto;">
-    <button onclick="shiftMonth(-1)" style="background:#3a3a3a;border:1px solid #505050;border-radius:3px;color:#d4d4d4;width:30px;height:30px;cursor:pointer;font-size:14px;display:flex;align-items:center;justify-content:center;flex-shrink:0;-webkit-tap-highlight-color:transparent;">◀</button>
-    <span id="month-label" style="font-size:11px;font-weight:700;color:#2ecc71;min-width:90px;text-align:center;"></span>
-    <button onclick="shiftMonth(1)" style="background:#3a3a3a;border:1px solid #505050;border-radius:3px;color:#d4d4d4;width:30px;height:30px;cursor:pointer;font-size:14px;display:flex;align-items:center;justify-content:center;flex-shrink:0;-webkit-tap-highlight-color:transparent;">▶</button>
+  <div class="logo">
+    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+      <path d="M13 2L4.5 13.5H11L10 22L19.5 10.5H13L13 2Z" class="logo-bolt" stroke-width="1" stroke-linejoin="round"/>
+    </svg>
+  </div>
+  <div class="brand"><div class="bn">EnergiaCRM</div></div>
+  <div class="hdr-month">
+    <button class="hdr-month-btn" onclick="shiftMonth(-1)" aria-label="Mês anterior">
+      <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="15 18 9 12 15 6"/></svg>
+    </button>
+    <span id="month-label"></span>
+    <button class="hdr-month-btn" onclick="shiftMonth(1)" aria-label="Próximo mês">
+      <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="9 18 15 12 9 6"/></svg>
+    </button>
   </div>
 </div>
 <!-- NAV TABS -->
 <nav class="nav">
-  <button class="nb on" onclick="goTab('dashboard',this)">⚡ Dashboard</button>
-  <button class="nb" onclick="goTab('readings',this)">📷 Leituras</button>
-  <button class="nb" onclick="goTab('charges',this)">💰 Cobranças</button>
-  <button class="nb" onclick="goTab('tenants',this)">👥 Inquilinos</button>
-  <button class="nb" onclick="goTab('history',this)">📊 Histórico</button>
-  <button class="nb" onclick="goTab('rental',this)">🏠 Aluguel</button>
-  <button class="nb" onclick="goTab('settings',this)">⚙️ Config</button>
+  <button class="nb on" onclick="goTab('dashboard',this)">Dashboard</button>
+  <button class="nb" onclick="goTab('charges',this)">Cobranças</button>
+  <button class="nb" onclick="goTab('tenants',this)">Inquilinos</button>
+  <button class="nb" onclick="goTab('history',this)">Histórico</button>
+  <button class="nb" onclick="goTab('rental',this)">Aluguel</button>
+  <button class="nb" onclick="goTab('settings',this)">Configurações</button>
 </nav>
 
 <div id="toast"></div>
@@ -263,7 +334,7 @@ tr:active td{background:#2a2a2a;}
 <!-- MODAL EDP -->
 <div class="mb" onclick="handleBackdropClick(event,'modal-edp')" id="modal-edp">
   <div class="md">
-    <h3>📄 Conta EDP</h3>
+    <h3>Conta EDP</h3>
     <p class="msub">Envie o PDF ou uma foto/print da conta. A IA lê automaticamente os campos <b style="color:#2ecc71">TUSD - Consumo kWh</b> e <b style="color:#2ecc71">TOTAL A PAGAR</b>.</p>
     <div style="margin-bottom:14px">
       <div class="fl">PDF ou imagem da conta EDP</div>
@@ -276,9 +347,12 @@ tr:active td{background:#2a2a2a;}
     </div>
     <div id="edp-cp" style="font-size:12px;color:#808080;margin-bottom:12px;min-height:18px;"></div>
     <div id="edp-err" style="display:none;font-size:12px;color:#e74c3c;background:#3A0A0A;border-radius:8px;padding:8px 12px;margin-bottom:12px;"></div>
-    <div class="row">
+    <div class="row" style="justify-content:space-between;">
       <button class="btn bg" onclick="closeM('modal-edp')">Cancelar</button>
-      <button class="btn bp" onclick="confirmEDP()">Confirmar</button>
+      <div style="display:flex;gap:6px;">
+        <button class="btn bs2" id="edp-remove-btn" style="background:rgba(176,64,58,.1);color:var(--red);border:1px solid rgba(176,64,58,.2);display:none;" onclick="if(confirm('Remover conta EDP?')){S.edp=null;S.charges={};delete S.edpHistory[CUR];delete S.chargesHistory[CUR];saveState();driveSave();closeM('modal-edp');render();}">Remover</button>
+        <button class="btn bp" onclick="confirmEDP()">Confirmar</button>
+      </div>
     </div>
   </div>
 </div>
@@ -286,7 +360,7 @@ tr:active td{background:#2a2a2a;}
 <!-- MODAL MEDIDOR -->
 <div class="mb" onclick="handleBackdropClick(event,'modal-meter')" id="modal-meter">
   <div class="md">
-    <h3>📷 Medidor</h3>
+    <h3>Medidor</h3>
     <p class="msub" id="meter-sub">Foto do medidor — a IA lê automaticamente.</p>
     <div id="meter-photo-preview"></div>
     <div style="margin-bottom:14px">
@@ -303,53 +377,37 @@ tr:active td{background:#2a2a2a;}
 
 <div class="main">
 
-<!-- API BANNER -->
-<div id="apib">
-  <span style="font-size:24px">🔑</span>
-  <p>Cole sua chave Anthropic para ativar leitura de PDF e fotos. <a href="https://console.anthropic.com/settings/keys" target="_blank" style="color:#2ecc71">Pegar chave →</a></p>
-  <div style="display:flex;gap:8px;width:100%;">
-    <input type="password" id="api-top" placeholder="sk-ant-..." style="flex:1" />
-    <button class="btn bp bs2" onclick="saveKey()">Salvar</button>
-    <button class="btn bg bs2" onclick="testAPI()">Testar</button>
-  </div>
-</div>
-
 <!-- DASHBOARD -->
 <div class="pg on" id="pg-dashboard">
-  <div class="stats">
-    <div class="card"><div class="sv" id="s-ten">0</div><div class="sl">Inquilinos</div></div>
-    <div class="card"><div class="sv" id="s-edp">—</div><div class="sl">Conta EDP</div></div>
-    <div class="card"><div class="sv" id="s-kwh">—</div><div class="sl">Custo/kWh</div></div>
-    <div class="card"><div class="sv" id="s-sent">0</div><div class="sl">Enviados</div></div>
-  </div>
   <div class="card">
-    <div class="ct">📄 Conta EDP</div>
+    <div class="ct">Conta EDP</div>
     <div id="edp-area">
-      <button class="btn bp" onclick="openEDP()">📋 Upload da conta EDP</button>
-      <span style="font-size:12px;color:#808080;margin-left:10px;">A IA extrai kWh e valor automaticamente</span>
+      <button class="btn bp" onclick="openEDP()">Upload da conta EDP</button>
+      <span style="font-size:12px;color:var(--mut);margin-left:10px;">A IA extrai kWh e valor automaticamente</span>
     </div>
   </div>
   <div class="card">
-    <div class="ct">⚡ Calcular</div>
-    <button class="btn bp" onclick="calcAll()">Calcular todas as cobranças</button>
-    <span style="font-size:12px;color:#808080;margin-left:10px;" id="calc-lbl"></span>
-  </div>
-  <div class="card">
-    <div class="ct">📋 Status</div>
-    <div class="tw"><table><thead><tr><th>Inquilino</th><th>Anterior</th><th>Atual</th><th>Consumo</th><th>Valor</th></tr></thead><tbody id="dash-tb"></tbody></table></div>
-  </div>
-</div>
-
-<!-- LEITURAS -->
-<div class="pg" id="pg-readings">
-  <div style="margin-bottom:12px;">
-    <div style="font-size:13px;color:#808080;margin-bottom:8px;">Mês: <strong id="read-month" style="color:#2ecc71"></strong></div>
-    <div style="display:flex;gap:8px;">
-      <button class="btn bp" style="flex:1;justify-content:center;min-height:44px;" onclick="openBulkUpload('prev')">📤 Upload anteriores</button>
-      <button class="btn bp" style="flex:1;justify-content:center;min-height:44px;" onclick="openBulkUpload('cur')">📤 Upload atuais</button>
+    <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:10px;">
+      <div class="ct" style="margin-bottom:0;">Leituras — <span id="read-month" style="text-transform:none;letter-spacing:0;font-weight:400;color:var(--text2);"></span></div>
     </div>
+    <div class="upload-grid" style="margin-bottom:12px;gap:8px;">
+      <div class="upload-card" onclick="openBulkUpload('prev')" style="min-height:52px;padding:10px 16px;flex-direction:row;gap:10px;">
+        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" style="color:var(--mut);flex-shrink:0;"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="17 8 12 3 7 8"/><line x1="12" y1="3" x2="12" y2="15"/></svg>
+        <div>
+          <div class="upload-card-title">Anteriores</div>
+          <div class="upload-card-sub">Upload em lote</div>
+        </div>
+      </div>
+      <div class="upload-card" onclick="openBulkUpload('cur')" style="min-height:52px;padding:10px 16px;flex-direction:row;gap:10px;">
+        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" style="color:var(--mut);flex-shrink:0;"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="17 8 12 3 7 8"/><line x1="12" y1="3" x2="12" y2="15"/></svg>
+        <div>
+          <div class="upload-card-title">Atuais</div>
+          <div class="upload-card-sub">Upload em lote</div>
+        </div>
+      </div>
+    </div>
+    <div id="dash-tb"></div>
   </div>
-  <div id="read-list"></div>
 </div>
 
 <!-- COBRANÇAS -->
@@ -363,7 +421,7 @@ tr:active td{background:#2a2a2a;}
 <!-- INQUILINOS -->
 <div class="pg" id="pg-tenants">
   <div class="card">
-    <div class="ct">➕ Novo inquilino</div>
+    <div class="ct">Novo inquilino</div>
     <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:10px;">
       <div><div class="fl">Nome</div><input type="text" id="n-name" placeholder="Nome completo"/></div>
       <div><div class="fl">Unidade</div><input type="text" id="n-unit" placeholder="Apt 301"/></div>
@@ -372,7 +430,7 @@ tr:active td{background:#2a2a2a;}
     <div style="margin-bottom:14px"><div class="fl">Nº de série do medidor (opcional)</div><input type="text" id="n-serial" placeholder="Ex: 98647144"/></div>
     <button class="btn bp btn-full" onclick="addTenant()">Adicionar inquilino</button>
   </div>
-  <div class="card"><div class="ct">👥 Cadastrados</div><div class="tw"><table><thead><tr><th>Nome</th><th>WhatsApp</th><th>Status</th><th>Ações</th></tr></thead><tbody id="ten-tb"></tbody></table></div></div>
+  <div class="card"><div class="ct">Cadastrados</div><div id="ten-tb"></div></div>
 </div>
 
 <!-- CONFIG -->
@@ -380,7 +438,7 @@ tr:active td{background:#2a2a2a;}
 <div class="pg" id="pg-rental">
   <div class="card">
     <div class="ct" style="display:flex;justify-content:space-between;align-items:center;margin-bottom:8px;">
-      <span>🏠 Análise de locação</span>
+      <span>Análise de locação</span>
       <button onclick="toggleRentalText()" id="rental-toggle-btn" class="btn bg bs2" style="font-size:11px;padding:3px 10px;">▼ Expandir</button>
     </div>
     <!-- Preview (always visible) -->
@@ -415,7 +473,7 @@ Assim que receber toda a documentação, encaminho para análise e retorno em at
   </div>
 
   <div class="card" style="margin-top:12px">
-    <div class="ct">📄 Gerar contrato de locação</div>
+    <div class="ct">Gerar contrato de locação</div>
     <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-bottom:8px;">
       <div><div class="fl">Nome completo</div><input type="text" id="ct-nome" placeholder="João da Silva"/></div>
       <div><div class="fl">Nacionalidade</div><input type="text" id="ct-nac" placeholder="brasileiro(a)" value="brasileiro"/></div>
@@ -470,7 +528,16 @@ Assim que receber toda a documentação, encaminho para análise e retorno em at
 
 <div class="pg" id="pg-settings">
   <div class="card">
-    <div class="ct">🔑 Chave API Anthropic</div>
+    <div class="ct">Aparência</div>
+    <div class="theme-toggle">
+      <div class="toggle-track" id="theme-track" onclick="toggleTheme()">
+        <div class="toggle-thumb"></div>
+      </div>
+      <span class="toggle-label" id="theme-label">Modo escuro</span>
+    </div>
+  </div>
+  <div class="card">
+    <div class="ct">Chave API Anthropic</div>
     <div class="ib" style="margin-bottom:14px"><b style="color:#2ecc71">Como obter:</b><br>1. Acesse <a href="https://console.anthropic.com" target="_blank" style="color:#2ecc71">console.anthropic.com</a><br>2. Crie conta → adicione crédito (US$5 dura meses)<br>3. API Keys → Create Key → copie e cole abaixo</div>
     <div style="margin-bottom:14px"><div class="fl">Chave (sk-ant-...)</div><input type="password" id="api-cfg" placeholder="sk-ant-api03-..."/></div>
     <div style="display:flex;gap:10px;align-items:center;flex-wrap:wrap;">
@@ -480,7 +547,7 @@ Assim que receber toda a documentação, encaminho para análise e retorno em at
     <div id="api-test-result" style="margin-top:10px;font-size:12px;display:none;padding:8px 12px;border-radius:7px;"></div>
   </div>
   <div class="card">
-    <div class="ct">📲 Z-API — WhatsApp</div>
+    <div class="ct">Z-API — WhatsApp</div>
     <div class="ib" style="margin-bottom:14px"><b style="color:#2ecc71">Como configurar:</b><br>1. <a href="https://z-api.io" target="_blank" style="color:#2ecc71">z-api.io</a> (~R$60/mês)<br>2. Crie instância → conecte WhatsApp pelo QR Code<br>3. Copie Instance ID e Token abaixo</div>
     <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-bottom:14px;">
       <div><div class="fl">Instance ID</div><input type="text" id="z-inst" placeholder="3D5F99A1..."/></div>
@@ -490,7 +557,7 @@ Assim que receber toda a documentação, encaminho para análise e retorno em at
   </div>
 
   <div class="card">
-    <div class="ct">🚀 Publicar no GitHub</div>
+    <div class="ct">Publicar no GitHub</div>
     <div class="ib" style="margin-bottom:14px;">
       <b style="color:#2ecc71">Como obter o token:</b><br>
       1. Acesse <a href="https://github.com/settings/tokens" target="_blank" style="color:#2ecc71">github.com/settings/tokens</a><br>
@@ -527,7 +594,7 @@ Assim que receber toda a documentação, encaminho para análise e retorno em at
 <!-- MODAL BULK UPLOAD -->
 <div class="mb" onclick="handleBackdropClick(event,'modal-bulk')" id="modal-bulk">
   <div class="md" style="max-width:520px">
-    <h3>📤 Upload em massa</h3>
+    <h3>Upload em massa</h3>
     <p class="msub">Selecione todas as fotos dos medidores de uma vez. A IA identifica automaticamente qual é de qual inquilino pelo número de série e pelo valor do display.</p>
     <div style="margin-bottom:14px">
       <label class="uz">
@@ -557,7 +624,7 @@ Assim que receber toda a documentação, encaminho para análise e retorno em at
 <!-- MODAL EDITAR INQUILINO -->
 <div class="mb" onclick="handleBackdropClick(event,'modal-edit-tenant')" id="modal-edit-tenant">
   <div class="md">
-    <h3>✏️ Editar inquilino</h3>
+    <h3>Editar inquilino</h3>
     <p class="msub">Atualize os dados do inquilino.</p>
     <div style="margin-bottom:10px"><div class="fl">Nome</div><input type="text" id="et-name" placeholder="Nome completo"/></div>
     <div style="margin-bottom:10px"><div class="fl">Unidade</div><input type="text" id="et-unit" placeholder="Ex: Apt 301"/></div>
@@ -724,6 +791,8 @@ function openEDP(editMode=false){
     preview.innerHTML=""; preview.style.display="none";
     document.getElementById("edp-ut").textContent="📤 Selecionar PDF ou imagem";
   }
+  const removeBtn = document.getElementById("edp-remove-btn");
+  if(removeBtn) removeBtn.style.display = (editMode && S.edp) ? "" : "none";
   openM("modal-edp");
 }
 
@@ -757,8 +826,8 @@ function shareEDP(month){
 }
 
 // ── API KEY ────────────────────────────────────────────────────────────────
-function saveKey(){ S.apiKey=document.getElementById("api-top").value.trim(); if(S.apiKey){localStorage.setItem("ek",S.apiKey);document.getElementById("apib").style.display="none";document.getElementById("api-cfg").value=S.apiKey;toast("✅ Chave salva!");}else toast("Cole a chave primeiro.",true); }
-function saveKeyCfg(){ S.apiKey=document.getElementById("api-cfg").value.trim(); if(S.apiKey){localStorage.setItem("ek",S.apiKey);document.getElementById("apib").style.display="none";toast("✅ Chave salva!");}else toast("Cole a chave primeiro.",true); }
+function saveKey(){ S.apiKey=document.getElementById("api-top")?.value.trim(); if(S.apiKey){localStorage.setItem("ek",S.apiKey);document.getElementById("api-cfg").value=S.apiKey;toast("✅ Chave salva!");}else toast("Cole a chave primeiro.",true); }
+function saveKeyCfg(){ S.apiKey=document.getElementById("api-cfg").value.trim(); if(S.apiKey){localStorage.setItem("ek",S.apiKey);toast("✅ Chave salva!");}else toast("Cole a chave primeiro.",true); }
 async function testAPI(){
   // Always use the settings result div
   let el = document.getElementById("api-test-result");
@@ -1029,7 +1098,7 @@ function openMeter(tid, which='cur'){
     previewEl.innerHTML=`<img src="data:${photoData.mime};base64,${photoData.b64}" style="width:100%;max-height:180px;object-fit:contain;border-radius:8px;border:1px solid #404040;margin-bottom:8px;"/>`;
     document.getElementById("meter-ut").textContent="✅ Foto já registrada (pode substituir)";
   } else if(photoData && photoData.type==="manual"){
-    previewEl.innerHTML=`<div style="background:#1a1a1a;border-radius:8px;padding:12px;text-align:center;margin-bottom:8px;color:#808080;font-size:12px">Valor inserido manualmente: <b style="color:#2ecc71">${photoData.value} kWh</b></div>`;
+    previewEl.innerHTML=`<div style="background:var(--sur2);border-radius:8px;padding:12px;text-align:center;margin-bottom:8px;color:var(--mut);font-size:12px">Valor inserido manualmente: <b style="color:var(--text)">${photoData.value} kWh</b></div>`;
     document.getElementById("meter-ut").textContent="📷 Adicionar foto";
   } else {
     previewEl.innerHTML="";
@@ -1234,13 +1303,13 @@ function openPhotos(month, tenantId){
     </div>`;
     if(data.type==="manual") return `<div style="flex:1;min-width:200px;background:#1a1a1a;border-radius:10px;padding:16px;text-align:center">
       <div style="font-size:11px;color:#808080;margin-bottom:8px;text-transform:uppercase;letter-spacing:.8px">${label}</div>
-      <div style="font-size:32px;font-weight:800;color:#2ecc71;font-family:'Syne',sans-serif">${reading||data.value}</div>
+      <div style="font-size:32px;font-weight:500;color:var(--text);font-family:'Inter',sans-serif">${reading||data.value}</div>
       <div style="font-size:11px;color:#808080;margin-top:4px">kWh · inserido manualmente</div>
     </div>`;
     return `<div style="flex:1;min-width:200px;background:#1a1a1a;border-radius:10px;padding:12px;text-align:center">
       <div style="font-size:11px;color:#808080;margin-bottom:8px;text-transform:uppercase;letter-spacing:.8px">${label}</div>
       <img src="data:${data.mime};base64,${data.b64}" style="width:100%;max-width:220px;border-radius:8px;border:1px solid #404040"/>
-      ${reading!=null?`<div style="font-size:20px;font-weight:800;color:#2ecc71;font-family:'Syne',sans-serif;margin-top:8px">${reading} kWh</div>`:""}
+      ${reading!=null?`<div style="font-size:20px;font-weight:500;color:var(--text);font-family:'Inter',sans-serif;margin-top:8px">${reading} kWh</div>`:""}
     </div>`;
   };
 
@@ -1273,39 +1342,30 @@ function renderHistory(){
     const activeTenants = S.tenants.filter(t=>t.active);
     return `<div class="card" style="margin-bottom:16px">
       <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:14px;flex-wrap:wrap;gap:8px">
-        <div style="font-size:15px;font-weight:700;color:#fff">${mlbl(month)}</div>
-        ${edp?`<div style="display:flex;gap:8px;flex-wrap:wrap">
-          <span style="background:#333;color:#999;padding:4px 12px;border-radius:20px;font-size:12px">📊 ${edp.kwh} kWh total</span>
-          <span style="background:#333;color:#999;padding:4px 12px;border-radius:20px;font-size:12px">💡 R$ ${edp.costPerKwh.toFixed(4)}/kWh</span>
-          <span style="background:#2A2000;color:#f0a500;padding:4px 12px;border-radius:20px;font-size:12px;font-weight:700">Conta: ${fmt(edp.total_brl)}</span>
-        </div>`:"<span style='color:#808080;font-size:12px'>Sem dados EDP</span>"}
+        <div style="font-size:14px;font-weight:500;color:var(--text)">${mlbl(month)}</div>
+        ${edp?`<div style="display:flex;gap:6px;flex-wrap:wrap">
+          <span style="background:var(--sur2);color:var(--text2);padding:3px 10px;border-radius:20px;font-size:11px;border:1px solid var(--bor)">${edp.kwh} kWh</span>
+          <span style="background:var(--sur2);color:var(--text2);padding:3px 10px;border-radius:20px;font-size:11px;border:1px solid var(--bor)">R$ ${edp.costPerKwh.toFixed(4)}/kWh</span>
+          <span style="background:var(--sur2);color:var(--text2);padding:3px 10px;border-radius:20px;font-size:11px;border:1px solid var(--bor);font-weight:500">${fmt(edp.total_brl)}</span>
+        </div>`:"<span style='color:var(--mut);font-size:12px'>Sem dados EDP</span>"}
       </div>
-      <div class="tw">
-        <table>
-          <thead><tr>
-            <th>Inquilino</th><th>Unidade</th><th>Leit. Anterior</th><th>Leit. Atual</th><th>Consumo</th><th>Valor</th><th>Status</th><th></th>
-          </tr></thead>
-          <tbody>
-            ${activeTenants.map(t=>{
-              const ch = charges[t.id];
-              const prev = getRd(t.id, month==="2999-99" ? PREV : (() => { const[y,m2]=month.split("-").map(Number); return m2===1?`${y-1}-12`:`${y}-${String(m2-1).padStart(2,"0")}`; })());
-              const cur = getRd(t.id, month);
-              const stMap={calculated:"bc",approved:"ba",sent:"bs0"};
-              const stLbl={calculated:"Calculado",approved:"Aprovado",sent:"Enviado"};
-              const hasPhotos = S.photoHistory[month]&&S.photoHistory[month][t.id];
-              return `<tr>
-                <td><b>${t.name}</b></td>
-                <td>${t.unit}</td>
-                <td style="color:${prev!=null?"var(--text)":"var(--mut)"}">${prev!=null?prev+" kWh":"—"}</td>
-                <td style="color:${cur!=null?"var(--text)":"var(--mut)"}">${cur!=null?cur+" kWh":"—"}</td>
-                <td>${ch?ch.diff+" kWh":"—"}</td>
-                <td style="font-weight:700;color:#2ecc71">${ch?fmt(ch.amount):"—"}</td>
-                <td>${ch?`<span class="badge ${stMap[ch.status]||"bp0"}">${stLbl[ch.status]||ch.status}</span>`:"—"}</td>
-                <td><button class="btn bg bs2 btn-photos" data-month="${month}" data-tid="${t.id}">${hasPhotos?"📷 Ver fotos":"📋 Ver"}</button></td>
-              </tr>`;
-            }).join("")}
-          </tbody>
-        </table>
+      <div style="display:flex;flex-direction:column;gap:0;">
+        ${activeTenants.map(t=>{
+          const ch = charges[t.id];
+          const prev = getRd(t.id, (()=>{ const[y,m2]=month.split("-").map(Number); return m2===1?`${y-1}-12`:`${y}-${String(m2-1).padStart(2,"0")}`; })());
+          const cur = getRd(t.id, month);
+          const hasPhotos = S.photoHistory[month]&&S.photoHistory[month][t.id];
+          return `<div style="display:flex;align-items:center;gap:8px;padding:9px 0;border-bottom:1px solid var(--bor);flex-wrap:wrap;">
+            <div style="flex:1;min-width:0;">
+              <div style="font-size:12px;font-weight:500;color:var(--text)">${t.name} <span style="font-weight:400;color:var(--mut)">· ${t.unit}</span></div>
+              <div style="font-size:11px;color:var(--mut);margin-top:2px;display:flex;gap:6px;flex-wrap:wrap;">
+                <span>${prev!=null?prev+" kWh":"—"}</span><span>→</span><span>${cur!=null?cur+" kWh":"—"}</span>
+                ${ch?`<span style="color:var(--text2)">· ${ch.diff} kWh · ${fmt(ch.amount)}</span>`:""}
+              </div>
+            </div>
+            <button class="btn bg bs2 btn-photos" data-month="${month}" data-tid="${t.id}" style="flex-shrink:0;">${hasPhotos?"📷 Fotos":"Ver"}</button>
+          </div>`;
+        }).join("")}
       </div>
     </div>`;
   }).join("");
@@ -1343,67 +1403,86 @@ function exportCSV(){
 // ── RENDER ─────────────────────────────────────────────────────────────────
 function render(){
   const active=S.tenants.filter(t=>t.active);
-  document.getElementById("s-ten").textContent=active.length;
-  document.getElementById("s-edp").textContent=S.edp?fmt(S.edp.total_brl):"—";
-  document.getElementById("s-kwh").textContent=S.edp?`R$ ${S.edp.costPerKwh.toFixed(4)}`:"—";
-  document.getElementById("s-sent").textContent=Object.values(S.charges).filter(c=>c.status==="sent").length;
-  document.getElementById("calc-lbl").textContent=mlbl(CUR);
   document.getElementById("read-month").textContent=mlbl(CUR);
 
   // EDP area
   const ea=document.getElementById("edp-area");
   if(S.edp){
-    ea.innerHTML=`<div style="display:flex;align-items:center;gap:10px;flex-wrap:wrap;">
-      <span style="background:#0d2b0d;color:#4caf50;padding:5px 12px;border-radius:20px;font-size:12px;font-weight:700">✅ Conta registrada</span>
-      <span style="font-size:13px;color:#9EA3BF">${S.edp.kwh} kWh · ${fmt(S.edp.total_brl)} · R$ ${S.edp.costPerKwh.toFixed(4)}/kWh</span>
-      <button class="btn bg bs2" onclick="openEDP(true)">✏️ Editar</button>
-      <button class="btn bg bs2" onclick="if(confirm('Remover conta EDP de ${mlbl(CUR)}?')){S.edp=null;S.charges={};delete S.edpHistory[CUR];delete S.chargesHistory[CUR];saveState();driveSave();render();}">🗑️</button>
-    </div>`;
+    ea.innerHTML=`
+      <div style="display:grid;grid-template-columns:repeat(4,1fr);gap:8px;">
+        <div style="background:var(--sur2);border:1px solid var(--bor);border-radius:7px;padding:10px 12px;">
+          <div style="font-size:10px;color:var(--mut);text-transform:uppercase;letter-spacing:.7px;margin-bottom:5px;">Consumo</div>
+          <div style="font-size:15px;font-weight:500;color:var(--text);line-height:1;">${S.edp.kwh.toLocaleString("pt-BR")}</div>
+          <div style="font-size:10px;color:var(--mut);margin-top:2px;">kWh</div>
+        </div>
+        <div style="background:var(--sur2);border:1px solid var(--bor);border-radius:7px;padding:10px 12px;">
+          <div style="font-size:10px;color:var(--mut);text-transform:uppercase;letter-spacing:.7px;margin-bottom:5px;">Valor</div>
+          <div style="font-size:15px;font-weight:500;color:var(--text);line-height:1;">${fmt(S.edp.total_brl)}</div>
+          <div style="font-size:10px;color:var(--mut);margin-top:2px;">conta EDP</div>
+        </div>
+        <div style="background:var(--sur2);border:1px solid var(--bor);border-radius:7px;padding:10px 12px;">
+          <div style="font-size:10px;color:var(--mut);text-transform:uppercase;letter-spacing:.7px;margin-bottom:5px;">Custo / kWh</div>
+          <div style="font-size:15px;font-weight:500;color:var(--text);line-height:1;">R$ ${S.edp.costPerKwh.toFixed(2)}</div>
+          <div style="font-size:10px;color:var(--mut);margin-top:2px;">este mês</div>
+        </div>
+        <button style="background:var(--sur2);border:1px solid var(--bor);border-radius:7px;padding:10px 12px;cursor:pointer;text-align:left;font-family:'Inter',sans-serif;-webkit-tap-highlight-color:transparent;" onclick="openEDP(true)">
+          <div style="font-size:10px;color:var(--mut);text-transform:uppercase;letter-spacing:.7px;margin-bottom:5px;">Editar</div>
+          <div style="font-size:15px;font-weight:500;color:var(--text);line-height:1;">Conta</div>
+          <div style="font-size:10px;color:var(--mut);margin-top:2px;">conta EDP</div>
+        </button>
+      </div>`;
   } else {
-    ea.innerHTML=`<button class="btn bp" onclick="openEDP()">📋 Upload da conta EDP</button><span style="font-size:12px;color:#808080;margin-left:10px;">A IA extrai kWh e valor automaticamente</span>`;
+    ea.innerHTML=`<button class="btn bp" onclick="openEDP()">Upload da conta EDP</button><span style="font-size:12px;color:var(--mut);margin-left:10px;">A IA extrai kWh e valor automaticamente</span>`;
   }
 
-  // Dashboard table
-  const stMap={pending:"bp0 Pendente",calculated:"bc Calculado",approved:"ba Aprovado",sent:"bs0 Enviado"};
-  document.getElementById("dash-tb").innerHTML=active.map(t=>{
-    const c=getRd(t.id,CUR),p=getRd(t.id,PREV),ch=S.charges[t.id];
-    return `<tr><td><b>${t.name}</b><br><span style="font-size:11px;color:#808080">${t.unit}</span></td>
-      <td style="color:${p!=null?"var(--text)":"var(--red)"}">${p!=null?p+" kWh":"Faltando"}</td>
-      <td style="color:${c!=null?"var(--text)":"var(--red)"}">${c!=null?c+" kWh":"Faltando"}</td>
-      <td>${ch?ch.diff+" kWh":"—"}</td>
-      <td style="font-weight:700;color:${ch?"#2ecc71":"#808080"}">${ch?fmt(ch.amount):"—"}</td></tr>`;
-  }).join("");
-
-  // Readings
-  const readList = document.getElementById("read-list");
+  // Dashboard — unified readings + status cards
+  const penIconSvg = `<svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/><path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"/></svg>`;
   if(active.length===0){
-    readList.innerHTML=`<div class="card" style="text-align:center;padding:40px">
-      <div style="font-size:40px;margin-bottom:12px">👥</div>
-      <div style="color:#808080;margin-bottom:16px;font-size:14px">Nenhum inquilino cadastrado ainda.</div>
-      <button class="btn bp" onclick="document.querySelectorAll('.nb')[3].click()">Cadastrar inquilinos</button>
-    </div>`;
+    document.getElementById("dash-tb").innerHTML=`<div style="text-align:center;padding:32px 0;color:var(--mut);font-size:13px;">Nenhum inquilino cadastrado.</div>`;
   } else {
-  readList.innerHTML=active.map(t=>{
-    const c=getRd(t.id,CUR),p=getRd(t.id,PREV);
-    return `<div class="card" style="margin-bottom:12px">
-      <div style="display:flex;justify-content:space-between;align-items:flex-start;flex-wrap:wrap;gap:12px">
-        <div>
-          <div style="font-weight:700;font-size:15px;font-family:'Syne',sans-serif">${t.name} <span style="color:#808080;font-weight:400;font-size:13px">· ${t.unit}</span></div>
-          <div style="font-size:12px;color:#808080;margin-bottom:10px">${t.phone}</div>
-          <div style="display:flex;gap:8px;flex-wrap:wrap;margin-bottom:12px">
-            ${p!=null?`<span style="background:#333;color:#999;padding:4px 10px;border-radius:20px;font-size:12px">Anterior: ${p} kWh</span>`:`<span style="background:#3A0A0A;color:#e74c3c;padding:4px 10px;border-radius:20px;font-size:12px">⚠️ Anterior: faltando</span>`}
-            ${c!=null?`<span style="background:#0d2b0d;color:#4caf50;padding:4px 10px;border-radius:20px;font-size:12px;font-weight:700">✅ Atual: ${c} kWh</span>`:`<span style="background:#2A1500;color:#f0a500;padding:4px 10px;border-radius:20px;font-size:12px">⚠️ Atual: faltando</span>`}
-            ${c!=null&&p!=null?`<span style="background:#2A2000;color:#f0a500;padding:4px 10px;border-radius:20px;font-size:12px;font-weight:700">Δ ${c-p} kWh</span>`:""}
+    document.getElementById("dash-tb").innerHTML=active.map(t=>{
+      const c=getRd(t.id,CUR),p=getRd(t.id,PREV),ch=S.charges[t.id];
+      const agua=50;
+      const total=ch?ch.amount+agua:null;
+      const consumo=(c!=null&&p!=null)?c-p:null;
+      const msg=ch&&S.edp?`Olá *${t.name}*! 👋\n\nSegue o resumo do seu consumo de energia referente a *${mlbl(CUR)}*:\n\n⚡ Leitura anterior: ${p} kWh\n⚡ Leitura atual: ${c} kWh\n📊 Consumo do mês: ${ch.diff} kWh\n\n💡 Custo por kWh este mês: R$ ${S.edp.costPerKwh.toFixed(4)}\n⚡ Valor energia: ${fmt(ch.amount)}\n💧 Valor água: R$ 50,00\n💰 *Total a pagar: ${fmt(total)}*\n\n🔑 Chave Pix (celular): 11975870144\n\nPor gentileza enviar o comprovante.\n\nObrigado! 🙏`:null;
+      return `<div style="padding:12px 0;border-bottom:1px solid var(--bor);">
+        <div style="font-size:13px;font-weight:500;color:var(--text);margin-bottom:10px;">
+          ${t.name} <span style="font-weight:400;font-size:11px;color:var(--mut);">· ${t.unit}</span>
+        </div>
+        <div style="display:grid;grid-template-columns:1fr 1fr 1fr 1fr;gap:6px;align-items:stretch;margin-bottom:10px;">
+          <button class="btn bg btn-full" style="font-size:11px;padding:7px 6px;justify-content:center;flex-direction:column;gap:3px;" onclick="openMeter(${t.id},'prev')">
+            <div style="display:flex;align-items:center;gap:4px;justify-content:center;">
+              <span style="width:5px;height:5px;border-radius:50%;background:${p!=null?'var(--dot-ok)':'var(--dot-miss)'};flex-shrink:0;display:inline-block;"></span>
+              <span style="font-size:10px;color:var(--mut);text-transform:uppercase;letter-spacing:.4px;">Anterior</span>
+            </div>
+            <div style="font-size:12px;color:var(--text);font-weight:500;">${p!=null?p+' kWh':'—'}</div>
+            <div style="font-size:10px;color:var(--mut);">${p!=null?'Editar':'Registrar'}</div>
+          </button>
+          <button class="btn ${c!=null?'bg':'bp'} btn-full" style="font-size:11px;padding:7px 6px;justify-content:center;flex-direction:column;gap:3px;" onclick="openMeter(${t.id},'cur')">
+            <div style="display:flex;align-items:center;gap:4px;justify-content:center;">
+              <span style="width:5px;height:5px;border-radius:50%;background:${c!=null?'var(--dot-ok)':'var(--dot-miss)'};flex-shrink:0;display:inline-block;"></span>
+              <span style="font-size:10px;${c!=null?'color:var(--mut)':'color:var(--bg)'};text-transform:uppercase;letter-spacing:.4px;">Atual</span>
+            </div>
+            <div style="font-size:12px;font-weight:500;">${c!=null?c+' kWh':'—'}</div>
+            <div style="font-size:10px;opacity:.7;">${c!=null?'Editar':'Registrar'}</div>
+          </button>
+          <div style="background:var(--sur2);border:1px solid var(--bor);border-radius:6px;padding:7px 10px;text-align:center;">
+            <div style="font-size:10px;color:var(--mut);text-transform:uppercase;letter-spacing:.4px;margin-bottom:3px;">Consumo</div>
+            <div style="font-size:12px;color:var(--text);font-weight:500;">${consumo!=null?consumo+' kWh':'—'}</div>
           </div>
-          <div style="display:flex;gap:8px;flex-wrap:wrap">
-            <button class="btn ${p!=null?"bg":"bp"} bs2" onclick="openMeter(${t.id},'prev')">${p!=null?"✏️ Editar anterior":"📷 Registrar leitura anterior"}</button>
-            <button class="btn ${c!=null?"bg":"bp"} bs2" onclick="openMeter(${t.id},'cur')">${c!=null?"✏️ Editar atual":"📷 Registrar leitura atual"}</button>
+          <div style="background:var(--sur2);border:1px solid var(--bor);border-radius:6px;padding:7px 10px;text-align:center;">
+            <div style="font-size:10px;color:var(--mut);text-transform:uppercase;letter-spacing:.4px;margin-bottom:3px;">Valor</div>
+            <div style="font-size:12px;color:var(--text);font-weight:500;">${total!=null?fmt(total):'—'}</div>
           </div>
         </div>
-      </div>
-    </div>`;
-  }).join("");
-  } // end else active.length>0
+        ${msg?`<button class="btn bg btn-full" style="font-size:11px;padding:6px 10px;" onclick="navigator.clipboard.writeText(\`${msg.replace(/`/g,'\\`')}\`).then(()=>toast('✅ Copiado!'))">
+          <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="9" y="9" width="13" height="13" rx="2"/><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/></svg>
+          Copiar mensagem
+        </button>`:''}
+      </div>`;
+    }).join("");
+  }
 
   // Charges
   const hasC=Object.keys(S.charges).length>0;
@@ -1416,23 +1495,17 @@ function render(){
       const agua = 50;
       const total = c.amount + agua;
       const msg=`Olá *${t.name}*! 👋\n\nSegue o resumo do seu consumo de energia referente a *${mlbl(CUR)}*:\n\n⚡ Leitura anterior: ${prev} kWh\n⚡ Leitura atual: ${cur} kWh\n📊 Consumo do mês: ${c.diff} kWh\n\n💡 Custo por kWh este mês: R$ ${S.edp?S.edp.costPerKwh.toFixed(4):"—"}\n⚡ Valor energia: ${fmt(c.amount)}\n💧 Valor água: R$ 50,00\n💰 *Total a pagar: ${fmt(total)}*\n\n🔑 Chave Pix (celular): 11975870144\n\nPor gentileza enviar o comprovante.\n\nObrigado! 🙏`;
-      return `<div class="card" style="margin-bottom:12px;border-left:3px solid #217346">
-        <div style="display:flex;justify-content:space-between;align-items:flex-start;gap:10px;flex-wrap:wrap">
-          <div style="flex:1;min-width:0">
-            <div style="display:flex;align-items:center;gap:8px;margin-bottom:8px;flex-wrap:wrap">
-              <span style="font-weight:700;font-size:14px;color:#fff">${t.name}</span>
-              <span style="color:#808080;font-size:12px">· ${t.unit}</span>
-            </div>
-            <div style="background:#1a1a1a;border-radius:3px;padding:10px 12px;font-size:12px;color:#b0b0b0;line-height:1.8;white-space:pre-line">${msg}</div>
-          </div>
-          <div style="display:flex;flex-direction:column;align-items:flex-end;gap:8px;flex-shrink:0">
-            <div style="font-size:22px;font-weight:700;color:#2ecc71">${fmt(total)}</div>
-            <button class="btn bg bs2" onclick="navigator.clipboard.writeText(\`${msg.replace(/`/g,'\\`')}\`).then(()=>toast('✅ Copiado!'))" title="Copiar mensagem">
-              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="9" y="9" width="13" height="13" rx="2"/><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/></svg>
-              Copiar
-            </button>
-          </div>
+      return `<div class="card" style="margin-bottom:12px;border-left:3px solid var(--bor2)">
+        <div style="display:flex;align-items:baseline;gap:8px;margin-bottom:10px;flex-wrap:wrap">
+          <span style="font-weight:500;font-size:14px;color:var(--text)">${t.name}</span>
+          <span style="color:var(--mut);font-size:12px">· ${t.unit}</span>
+          <span style="margin-left:auto;font-size:15px;font-weight:500;color:var(--text)">${fmt(total)}</span>
         </div>
+        <div style="background:var(--sur2);border-radius:5px;padding:10px 12px;font-size:12px;color:var(--text2);line-height:1.8;white-space:pre-line;margin-bottom:10px">${msg}</div>
+        <button class="btn bg btn-full" onclick="navigator.clipboard.writeText(\`${msg.replace(/`/g,'\\`')}\`).then(()=>toast('✅ Copiado!'))" title="Copiar mensagem">
+          <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="9" y="9" width="13" height="13" rx="2"/><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/></svg>
+          Copiar mensagem
+        </button>
       </div>`;
     }).join("");
   }
@@ -1440,18 +1513,22 @@ function render(){
   // Tenants
   renderHistory();
 
-  document.getElementById("ten-tb").innerHTML=S.tenants.map(t=>`<tr>
-    <td><b>${t.name}</b><br><span style="font-size:11px;color:#808080">${t.unit}</span>${t.serial?`<br><span style="font-size:10px;color:#606060">S/N: ${t.serial}</span>`:""}</td>
-    <td style="font-family:monospace;font-size:11px;color:#999">${t.phone}</td>
-    <td><span style="background:${t.active?"#0d2b0d":"#3a1a1a"};color:${t.active?"#4caf50":"#e74c3c"};padding:3px 8px;border-radius:3px;font-size:11px;font-weight:700">${t.active?"Ativo":"Inativo"}</span></td>
-    <td>
-      <div style="display:flex;gap:4px;flex-wrap:wrap;">
+  document.getElementById("ten-tb").innerHTML=S.tenants.map(t=>`
+    <div style="display:flex;align-items:center;gap:10px;padding:10px 0;border-bottom:1px solid var(--bor);">
+      <div style="flex:1;min-width:0;">
+        <div style="font-size:13px;font-weight:500;color:var(--text);display:flex;align-items:center;gap:6px;flex-wrap:wrap;">
+          ${t.name}
+          <span style="background:${t.active?"rgba(74,154,106,.12)":"rgba(176,64,58,.12)"};color:${t.active?"var(--grn)":"var(--red)"};padding:1px 7px;border-radius:3px;font-size:10px;font-weight:500;">${t.active?"Ativo":"Inativo"}</span>
+        </div>
+        <div style="font-size:11px;color:var(--mut);margin-top:2px;">${t.unit}${t.serial?` · S/N ${t.serial}`:""}</div>
+        <div style="font-family:monospace;font-size:11px;color:var(--mut);margin-top:1px;">${t.phone}</div>
+      </div>
+      <div style="display:flex;flex-direction:column;gap:4px;flex-shrink:0;">
         <button class="btn bg bs2" onclick="openEditTenant(${t.id})">✏️ Editar</button>
         <button class="btn bg bs2" onclick="S.tenants.find(x=>x.id===${t.id}).active=!S.tenants.find(x=>x.id===${t.id}).active;saveState();render()">${t.active?"⏸ Inativar":"▶ Ativar"}</button>
-        <button class="btn bs2" style="background:#3a1a1a;color:#e74c3c;border:1px solid #5a2a2a;" onclick="deleteTenant(${t.id})">🗑️ Excluir</button>
+        <button class="btn bs2" style="background:rgba(176,64,58,.1);color:var(--red);border:1px solid rgba(176,64,58,.2);" onclick="deleteTenant(${t.id})">🗑️</button>
       </div>
-    </td>
-  </tr>`).join("");
+    </div>`).join("");
 }
 
 
@@ -1782,7 +1859,7 @@ function driveSaveDebounced(){
 
   // Load API keys
   const k=localStorage.getItem("ek");
-  if(k){S.apiKey=k;document.getElementById("apib").style.display="none";document.getElementById("api-cfg").value=k;}
+  if(k){S.apiKey=k;document.getElementById("api-cfg").value=k;}
   const z=localStorage.getItem("ez");
   if(z){const p=JSON.parse(z);S.zapiInst=p.i;S.zapiTok=p.t;document.getElementById("z-inst").value=p.i;document.getElementById("z-tok").value=p.t;}
 
@@ -2654,6 +2731,28 @@ function handleBackdropClick(e, modalId){
       }
     }
   },{passive:true});
+})();
+
+// ── THEME TOGGLE ──────────────────────────────────────────────────────────
+function toggleTheme(){
+  const isLight = document.body.classList.toggle('light-mode');
+  localStorage.setItem('energiacrm_theme', isLight ? 'light' : 'dark');
+  const track = document.getElementById('theme-track');
+  const label = document.getElementById('theme-label');
+  if(track) track.classList.toggle('on', isLight);
+  if(label) label.textContent = isLight ? 'Modo claro' : 'Modo escuro';
+}
+// Restaurar tema salvo:
+(function(){
+  if(localStorage.getItem('energiacrm_theme') === 'light'){
+    document.body.classList.add('light-mode');
+    window.addEventListener('DOMContentLoaded', () => {
+      const tr = document.getElementById('theme-track');
+      const lb = document.getElementById('theme-label');
+      if(tr) tr.classList.add('on');
+      if(lb) lb.textContent = 'Modo claro';
+    });
+  }
 })();
 
 </script>
