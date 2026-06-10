@@ -2,7 +2,7 @@
 <html lang="pt-BR">
 <head>
 <meta charset="UTF-8"/>
-<meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no"/>
 <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate"/>
 <meta http-equiv="Pragma" content="no-cache"/>
 <meta http-equiv="Expires" content="0"/>
@@ -473,7 +473,18 @@ Assim que receber toda a documentação, encaminho para análise e retorno em at
   </div>
 
   <div class="card" style="margin-top:12px">
-    <div class="ct">Gerar contrato de locação</div>
+    <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:12px;flex-wrap:wrap;gap:8px;">
+      <div class="ct" style="margin-bottom:0;">Gerar contrato de locação</div>
+      <button class="btn bg bs2" onclick="fillContractDummy()" title="Preencher campos com exemplo">🎲 Exemplo</button>
+    </div>
+    <!-- Locador toggle -->
+    <div style="margin-bottom:12px;">
+      <div class="fl">Locador</div>
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:6px;margin-top:4px;">
+        <button id="loc-ian-btn" class="btn bp btn-full" onclick="setLocador('ian')" style="font-size:12px;padding:7px;">Ian Felisberto</button>
+        <button id="loc-ric-btn" class="btn bg btn-full" onclick="setLocador('ric')" style="font-size:12px;padding:7px;">Ricardo Furbino</button>
+      </div>
+    </div>
     <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-bottom:8px;">
       <div><div class="fl">Nome completo</div><input type="text" id="ct-nome" placeholder="João da Silva"/></div>
       <div><div class="fl">Nacionalidade</div><input type="text" id="ct-nac" placeholder="brasileiro(a)" value="brasileiro"/></div>
@@ -510,18 +521,34 @@ Assim que receber toda a documentação, encaminho para análise e retorno em at
     </div>
     <div style="margin-bottom:8px"><div class="fl">Tipo de comércio</div><input type="text" id="ct-comercio" placeholder="depósito e loja de artesanato"/></div>
     <div style="margin-bottom:8px"><div class="fl">Data de início (dd/mm/aaaa)</div><input type="text" id="ct-datainicio" placeholder="01/06/2026"/></div>
-    <div style="margin-bottom:14px">
-      <div class="fl">Vedação de bebidas alcoólicas?</div>
-      <div style="display:flex;gap:16px;margin-top:6px;">
-        <label style="display:flex;align-items:center;gap:6px;cursor:pointer;font-size:13px;color:#d4d4d4;">
-          <input type="radio" name="ct-bebidas" value="sim" checked style="accent-color:#217346"> Sim
-        </label>
-        <label style="display:flex;align-items:center;gap:6px;cursor:pointer;font-size:13px;color:#d4d4d4;">
-          <input type="radio" name="ct-bebidas" value="nao" style="accent-color:#217346"> Não
-        </label>
+    <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-bottom:14px;">
+      <div>
+        <div class="fl">Vedação de bebidas alcoólicas?</div>
+        <div style="display:flex;gap:16px;margin-top:6px;">
+          <label style="display:flex;align-items:center;gap:6px;cursor:pointer;font-size:13px;color:#d4d4d4;">
+            <input type="radio" name="ct-bebidas" value="sim" checked style="accent-color:#217346"> Sim
+          </label>
+          <label style="display:flex;align-items:center;gap:6px;cursor:pointer;font-size:13px;color:#d4d4d4;">
+            <input type="radio" name="ct-bebidas" value="nao" style="accent-color:#217346"> Não
+          </label>
+        </div>
+      </div>
+      <div>
+        <div class="fl">Renovação automática?</div>
+        <div style="display:flex;gap:16px;margin-top:6px;">
+          <label style="display:flex;align-items:center;gap:6px;cursor:pointer;font-size:13px;color:#d4d4d4;">
+            <input type="radio" name="ct-renovacao" value="sim" checked style="accent-color:#217346"> Sim
+          </label>
+          <label style="display:flex;align-items:center;gap:6px;cursor:pointer;font-size:13px;color:#d4d4d4;">
+            <input type="radio" name="ct-renovacao" value="nao" style="accent-color:#217346"> Não
+          </label>
+        </div>
       </div>
     </div>
-    <button class="btn bp btn-full" onclick="generateContractPDF()">📄 Gerar contrato PDF</button>
+    <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;">
+      <button class="btn bp btn-full" onclick="generateContractPDF()">📄 Gerar PDF</button>
+      <button class="btn bg btn-full" onclick="generateContractDOCX()">📝 Gerar DOCX</button>
+    </div>
     <div id="ct-error" style="display:none;margin-top:8px;font-size:12px;color:#e74c3c;"></div>
   </div>
 </div>
@@ -695,6 +722,7 @@ function shiftMonth(delta){
 
 // ── PERSIST ────────────────────────────────────────────────────────────────
 function saveState(){
+  if(S._demo) return; // modo demo — não persiste
   const data = {
     tenants: S.tenants,
     readings: S.readings,
@@ -1687,6 +1715,7 @@ async function driveFindOrCreateFile(){
 
 async function driveSave(){
   if(!GDRIVE.token || !GDRIVE.fileId || GDRIVE.syncing) return;
+  if(S._demo){ toast('⚠️ Modo demo — dados não são salvos no Drive', true); return; }
   GDRIVE.syncing = true;
   driveSetStatus("sync","salvando...");
   try{
@@ -1820,6 +1849,7 @@ async function checkEDPPendente(){
 let driveSaveTimer=null;
 function driveSaveDebounced(){
   if(!GDRIVE.token) return;
+  if(S._demo) return; // modo demo — não sincroniza com Drive
   clearTimeout(driveSaveTimer);
   driveSaveTimer=setTimeout(driveSave, 1500);
 }
@@ -1908,6 +1938,64 @@ if(!('ontouchstart' in window) && !navigator.maxTouchPoints){
 }
 
 // ── CONTRATO DE LOCAÇÃO ────────────────────────────────────────────────────
+const LOCADORES = {
+  ian: {
+    nome: "Ian Felisberto Villefort",
+    cpf:  "152.495.727-58",
+    rg:   "152.495.727-58 SSPSC",
+    nac:  "brasileiro",
+    ecivil:"solteiro",
+    prof: "analista comercial",
+    end:  "Rodovia Santa Cruz, 615, Praia Grande, Fundão - ES - CEP 29187-000",
+  },
+  ric: {
+    nome: "Ricardo Furbino Villefort",
+    cpf:  "698.029.477-68",
+    rg:   "698.029.477-68 SSPES",
+    nac:  "brasileiro",
+    ecivil:"divorciado",
+    prof: "empresário",
+    end:  "Rodovia Santa Cruz, 615, Praia Grande, Fundão - ES - CEP 29187-000",
+  },
+};
+let selectedLocador = "ian";
+
+function setLocador(who){
+  selectedLocador = who;
+  document.getElementById("loc-ian-btn").className = "btn btn-full" + (who==="ian"?" bp":" bg") + " ";
+  document.getElementById("loc-ric-btn").className = "btn btn-full" + (who==="ric"?" bp":" bg") + " ";
+  // fix font size after className reset
+  ["loc-ian-btn","loc-ric-btn"].forEach(id=>{
+    document.getElementById(id).style.cssText="font-size:12px;padding:7px;";
+  });
+}
+
+function fillContractDummy(){
+  const set = (id,v) => { const el=document.getElementById(id); if(el) el.value=v; };
+  set("ct-nome",      "Carlos Mendonça");
+  set("ct-nac",       "brasileiro");
+  set("ct-ecivil",    "solteiro");
+  set("ct-prof",      "comerciante");
+  set("ct-rg",        "1.987.654 ES");
+  set("ct-cpf",       "123.456.789-00");
+  set("ct-cep",       "29185-000");
+  set("ct-rua",       "Rua Coronel Borges");
+  set("ct-numend",    "47");
+  set("ct-estado",    "ES");
+  set("ct-bairro",    "Centro");
+  set("ct-cidade",    "Fundão");
+  set("ct-numimovel", "648");
+  set("ct-valor",     "1350");
+  set("ct-comercio",  "depósito e loja de artesanato");
+  const today = new Date();
+  const mm = String(today.getMonth()+1).padStart(2,"0");
+  const yyyy = today.getFullYear();
+  set("ct-datainicio", `01/${mm}/${yyyy}`);
+  const bebidasNao = document.querySelector('input[name="ct-bebidas"][value="nao"]');
+  if(bebidasNao) bebidasNao.checked = true;
+  toast("🎲 Campos do contrato preenchidos!");
+}
+
 async function generateContractPDF(){
   const err = document.getElementById("ct-error");
   err.style.display="none";
@@ -1952,6 +2040,10 @@ async function generateContractPDF(){
     const dataFim = String(dtFim.getDate()).padStart(2,"0")+"/"+String(dtFim.getMonth()+1).padStart(2,"0")+"/"+dtFim.getFullYear();
     const valorTotal = (parseFloat(f.valor)*12).toLocaleString("pt-BR");
     const vedaBebidas = f.bebidas ? "nem a venda de bebidas alcoólicas e " : "";
+    const renovacao = document.querySelector('input[name="ct-renovacao"]:checked')?.value === "sim";
+    const clauseII = renovacao
+      ? `O prazo de locação é de prazo determinado de 12 meses, tendo início em ${f.datainicio} e término previsto para o dia ${dataFim}. O contrato por prazo determinado cessa, de pleno direito, findo o prazo estipulado, independentemente de notificação ou aviso. Caso, ao fim do contrato, o LOCATÁRIO continuar no imóvel por mais de 30 (trinta) dias, sem oposição do LOCADOR, ficará a locação prorrogada automaticamente por prazo indeterminado, nas mesmas bases contratuais; Caso a locação tenha sido prorrogada por prazo indeterminado, o contrato poderá ser cancelado a qualquer momento, desde que respeitados os 30 dias de aviso prévio (artigo 57 da lei do inquilinato). Após o recebimento de pedido por escrito do LOCATÁRIO para encerramento do contrato, o LOCADOR terá o prazo de dez dias para efetuar a vistoria do imóvel, correndo por conta do LOCATÁRIO o aluguel até a efetiva devolução do imóvel ao LOCADOR.`
+      : `O prazo de locação é de prazo determinado de 12 meses, tendo início em ${f.datainicio} e término previsto para o dia ${dataFim}, data em que o LOCATÁRIO se obriga a restituir o imóvel desocupado ou de outra forma a renovar expressamente o contrato, caso seja da vontade de ambas as partes. O contrato por prazo determinado cessa, de pleno direito, findo o prazo estipulado, independentemente de notificação ou aviso (art. 573 CCB 2002).`;
     const meses = ["Janeiro","Fevereiro","Março","Abril","Maio","Junho","Julho","Agosto","Setembro","Outubro","Novembro","Dezembro"];
     const hoje = new Date();
     const dataAssinatura = String(hoje.getDate()).padStart(2,"0")+" de "+meses[hoje.getMonth()]+" de "+hoje.getFullYear();
@@ -1994,24 +2086,90 @@ async function generateContractPDF(){
     }
 
     function drawClause(roman, text){
-      const prefix = roman + ": ";
-      const boldW = doc.getTextWidth(prefix);
-      const lines = doc.splitTextToSize(prefix + text, TW);
-      lines.forEach((line, i) => {
-        newPageIfNeeded(LEAD);
-        if(i === 0){
-          doc.setFont("helvetica","bold");
-          doc.text(prefix, ML, cy);
-          doc.setFont("helvetica","normal");
-          const rest = line.startsWith(prefix) ? line.slice(prefix.length) : line.slice(prefix.trimEnd().length);
-          if(rest.trim()) doc.text(rest, ML + boldW, cy);
-        } else {
-          doc.setFont("helvetica","normal");
-          doc.text(line, ML, cy);
+      doc.setFontSize(FS);
+
+      // Check if text has bold markers
+      const hasBold = text.includes("***");
+
+      if(!hasBold){
+        // Simple case: no inline bold — just use splitTextToSize, draw line by line
+        const prefix = roman + ": ";
+        const full = prefix + text;
+        const lines = doc.splitTextToSize(full, TW);
+        lines.forEach((line, i) => {
+          newPageIfNeeded(LEAD);
+          if(i === 0){
+            // Draw prefix in bold, rest in normal, on same line
+            doc.setFont("helvetica","bold");
+            const pw = doc.getTextWidth(prefix);
+            doc.text(prefix, ML, cy);
+            doc.setFont("helvetica","normal");
+            const rest = line.slice(prefix.length);
+            if(rest) doc.text(rest, ML + pw, cy);
+          } else {
+            doc.setFont("helvetica","normal");
+            doc.text(line, ML, cy);
+          }
+          cy += LEAD;
+        });
+      } else {
+        // Inline bold: split text around *** markers into plain segments
+        // Build plain version for line-breaking, then re-draw with bold applied per-line
+        const segs = []; // {t, b}
+        text.split(/(\*\*\*[\s\S]*?\*\*\*)/).forEach(p => {
+          if(p.startsWith("***") && p.endsWith("***")) segs.push({t: p.slice(3,-3), b:true});
+          else if(p) segs.push({t: p, b:false});
+        });
+        const plain = segs.map(s=>s.t).join("");
+        const prefix = roman + ": ";
+        const lines = doc.splitTextToSize(prefix + plain, TW);
+
+        // Walk lines; for each line find which chars are bold using segs
+        const boldArr = []; // boldArr[i] = true if char i of plain is bold
+        segs.forEach(s => { for(let i=0;i<s.t.length;i++) boldArr.push(s.b); });
+
+        let plainPos = 0; // position in plain text
+        lines.forEach((line, li) => {
+          newPageIfNeeded(LEAD);
+          let cx = ML;
+          if(li === 0){
+            // draw bold prefix first
+            doc.setFont("helvetica","bold");
+            const pw = doc.getTextWidth(prefix);
+            doc.text(prefix, cx, cy);
+            cx += pw;
+            // body part of first line
+            const bodyPart = line.slice(prefix.length);
+            drawBoldRuns(cx, cy, bodyPart, boldArr, plainPos);
+            plainPos += bodyPart.length;
+          } else {
+            drawBoldRuns(cx, cy, line, boldArr, plainPos);
+            plainPos += line.length;
+          }
+          cy += LEAD;
+        });
+      }
+      cy += LEAD * 0.5;
+      doc.setFont("helvetica","normal");
+    }
+
+    function drawBoldRuns(startX, y, str, boldArr, offset){
+      // Group consecutive chars with same boldness into runs, draw each run
+      let cx = startX;
+      let runStart = 0;
+      for(let i = 0; i <= str.length; i++){
+        const curBold = i < str.length ? (boldArr[offset + i] || false) : null;
+        const prevBold = i > 0 ? (boldArr[offset + i - 1] || false) : null;
+        if(i === str.length || (i > 0 && curBold !== prevBold)){
+          const chunk = str.slice(runStart, i);
+          if(chunk){
+            doc.setFont("helvetica", prevBold ? "bold" : "normal");
+            doc.text(chunk, cx, y);
+            cx += doc.getTextWidth(chunk);
+          }
+          runStart = i;
         }
-        cy += LEAD;
-      });
-      cy += LEAD * 0.4;
+      }
     }
 
     function drawSignature(name){
@@ -2037,21 +2195,22 @@ async function generateContractPDF(){
     // Title
     drawParagraph("Contrato de Locação não residencial", {bold:true, align:"center", size:11, after:LEAD*0.8});
 
+    const loc = LOCADORES[selectedLocador];
     // Intro
     drawParagraph(
-      `Pelo presente instrumento particular, de um lado, como LOCADOR, Ian Felisberto Villefort, RG(CIN) 152.495.727-58 SSPSC, CPF 152.495.727-58, brasileiro, solteiro, analista comercial, residente e domiciliado no endereço Rodovia Santa Cruz, 615, Praia Grande, Fundão - ES e, de outro lado, como LOCATÁRIO, ${f.nome}, ${f.nac}, ${f.ecivil}, ${f.prof}, RG ${f.rg}, inscrito sob o CPF ${f.cpf}, residente e domiciliado em ${f.rua}, ${f.numend}, ${f.bairro} - ${f.cidade} ${f.estado} - CEP ${f.cep}, resolvem celebrar o presente contrato de locação, o qual reger-se-á pelas seguintes cláusulas e condições:`,
+      `Pelo presente instrumento particular, de um lado, como LOCADOR, ${loc.nome}, RG(CIN) ${loc.rg}, CPF ${loc.cpf}, ${loc.nac}, ${loc.ecivil}, ${loc.prof}, residente e domiciliado no endereço ${loc.end} e, de outro lado, como LOCATÁRIO, ${f.nome}, ${f.nac}, ${f.ecivil}, ${f.prof}, RG ${f.rg}, inscrito sob o CPF ${f.cpf}, residente e domiciliado em ${f.rua}, ${f.numend}, ${f.bairro} - ${f.cidade} ${f.estado} - CEP ${f.cep}, resolvem celebrar o presente contrato de locação, o qual reger-se-á pelas seguintes cláusulas e condições:`,
       {after:LEAD*1.0}
     );
 
     const clauses = [
       ["I. OBJETO", `Constitui objeto do presente contrato a locação do imóvel situado na Rodovia Santa Cruz, ${f.numimovel}, Praia Grande, Fundão - ES, composto na parte em questão por 1 sala com aproximadamente 10 m².`],
-      ["II. PRAZO", `O prazo de locação é de prazo determinado de 12 meses, tendo início em ${f.datainicio} e término previsto para o dia ${dataFim}. O contrato por prazo determinado cessa, de pleno direito, findo o prazo estipulado, independentemente de notificação ou aviso. Caso, ao fim do contrato, o LOCATÁRIO continuar no imóvel por mais de 30 (trinta) dias, sem oposição do LOCADOR, ficará a locação prorrogada automaticamente por prazo indeterminado, nas mesmas bases contratuais; Caso a locação tenha sido prorrogada por prazo indeterminado, o contrato poderá ser cancelado a qualquer momento, desde que respeitados os 30 dias de aviso prévio (artigo 57 da lei do inquilinato). Após o recebimento de pedido por escrito do LOCATÁRIO para encerramento do contrato, o LOCADOR terá o prazo de dez dias para efetuar a vistoria do imóvel, correndo por conta do LOCATÁRIO o aluguel até a efetiva devolução do imóvel ao LOCADOR.`],
-      ["III. FINALIDADE", `A sala comercial é locada para uso exclusivamente como ${f.comercio}, não podendo, o locatário, exercer outro ramo senão o aqui estipulado, não sendo permitida a ocupação fora dos limites da sala, ${vedaBebidas}nem de alimentos. Fumar no interior do estabelecimento também não é permitido.`],
+      ["II. PRAZO", clauseII],
+      ["III. FINALIDADE", `A sala comercial é locada para uso exclusivamente como ${f.comercio}, ***não podendo, o locatário, exercer outro ramo senão o aqui estipulado***, não sendo permitida a ocupação fora dos limites da sala${vedaBebidas ? ", nem a venda de bebidas alcoólicas" : ""}. Fumar no interior do estabelecimento também não é permitido.`],
       ["IV. PREÇO E FORMA DE PAGAMENTO", `O valor do aluguel mensal é de ${f.valor} reais, a ser pago todo dia 10, totalizando ${valorTotal} reais ao longo dos 12 meses de contrato. Findo esse prazo, os valores podem sofrer reajuste, como especificado na cláusula de número VI.`],
       ["V. ATRASO NO PAGAMENTO", `O não pagamento do aluguel no prazo ajustado na cláusula 4ª implicará em multa de 2% (dois por cento) sobre o valor do débito, juros de 1% (um por cento) ao mês e correção monetária.`],
       ["VI. REAJUSTE DO ALUGUEL", `O aluguel pactuado na cláusula anterior poderá sofrer reajustes anuais com base na variação do Índice Nacional de Preços ao Consumidor Amplo (IPCA) ou outro índice que porventura venha a substituí-lo. O aluguel não poderá sofrer reajuste acima dos índices, a não ser que seja expressamente com a finalidade de ajustar o valor ao nível de mercado atual.`],
       ["VII. ALVARÁ DE VISTORIA DO CORPO DE BOMBEIROS", `O LOCATÁRIO obriga-se, às suas expensas, a providenciar, obter e manter válido durante toda a vigência do contrato o Alvará do Corpo de Bombeiros (AVCB) exigido pela legislação vigente, de acordo com a atividade exercida no imóvel. O LOCATÁRIO compromete-se ainda a renovar o referido alvará sempre que necessário, bem como a adequar o imóvel às exigências técnicas do Corpo de Bombeiros, assumindo integral responsabilidade por eventuais adequações, instalações, equipamentos e manutenções exigidas, desde que compatíveis com o uso contratado. A não obtenção, não renovação ou vencimento do Alvará do Corpo de Bombeiros caracterizará infração contratual grave, sujeitando o LOCATÁRIO à rescisão contratual. O LOCATÁRIO declara ciência de que nenhuma atividade poderá ser exercida no imóvel em desacordo com as normas de segurança, isentando o LOCADOR de qualquer responsabilidade decorrente do descumprimento desta obrigação.`],
-      ["VIII. BENFEITORIAS, ALTERAÇÕES E USO DO IMÓVEL", `Qualquer alteração, intervenção ou adaptação nas instalações elétricas ou hidráulicas do imóvel somente poderá ser realizada mediante prévia e expressa autorização do LOCADOR. As intervenções deverão ser executadas por profissionais legalmente habilitados, aprovados ou indicados pelo LOCADOR. Fica a cargo do locatário a decoração, manutenção e escolha da decoração interna do imóvel. Fica a cargo do locatário a preservação da fachada sem que faça alterações no exterior do imóvel, a não ser por uma placa que identifique o estabelecimento. O locatário obriga-se a manter o imóvel locado em boas condições de higiene, limpeza e conservação, mantendo em perfeito estado as suas instalações elétricas e hidráulicas, a fim de restituí-lo no estado em que recebeu. O locador obriga-se a garantir a segurança estrutural do imóvel, assim como suas demais obrigações legais.`],
+      ["VIII. BENFEITORIAS, ALTERAÇÕES E USO DO IMÓVEL", `Qualquer alteração, intervenção ou adaptação nas instalações elétricas ou hidráulicas do imóvel somente poderá ser realizada mediante prévia e expressa autorização do LOCADOR. As intervenções deverão ser executadas por profissionais legalmente habilitados, aprovados ou indicados pelo LOCADOR. Fica a cargo do locatário a decoração, manutenção e escolha da decoração interna do imóvel. Fica a cargo do locatário a preservação da fachada sem que faça alterações no exterior do imóvel, a não ser por uma placa que identifique o estabelecimento. O locatário obriga-se a manter o imóvel locado em boas condições de higiene, limpeza e conservação, mantendo em perfeito estado as suas instalações elétricas e hidráulicas, a fim de restituí-lo no estado em que recebeu. O locador obriga-se a garantir a segurança estrutural do imóvel, assim como suas demais obrigações legais. O locatário renuncia expressamente ao direito de indenização e ao exercício do direito de retenção por quaisquer benfeitorias introduzidas no imóvel, sejam elas necessárias, úteis ou voluptuárias, nos termos do art. 35 da Lei nº 8.245/91.`],
       ["IX. EXIGÊNCIAS DOS PODERES PÚBLICOS", `Obriga-se o locatário a satisfazer a todas as exigências dos poderes públicos a que der causa.`],
       ["X. CESSÃO, SUBLOCAÇÃO E EMPRÉSTIMO", `O locatário não poderá transferir este contrato, ceder, emprestar, ou sublocar o imóvel no todo ou em parte, sem prévia autorização por escrito do locador.`],
       ["XI. DESPESAS DE CONDOMÍNIO, CONSUMO E TAXAS", `Todas as despesas decorrentes da locação, quais sejam, consumo de água, luz, telefone e gás, ficam a cargo do locatário, cabendo-lhe efetuar diretamente esses pagamentos nas devidas épocas. O valor será acordado entre taxa mínima ou medição, de acordo com o nível do consumo.`],
@@ -2062,11 +2221,11 @@ async function generateContractPDF(){
 
     clauses.forEach(([roman, text]) => drawClause(roman, text));
 
-    drawParagraph("E, por estarem, assim ajustados, assinam o presente contrato.", {after:LEAD*3});
-    drawParagraph(`Fundão, ${dataAssinatura}.`, {align:"center", after:LEAD*5});
+    drawParagraph("E, por estarem, assim ajustados, assinam o presente contrato.", {after:LEAD*1.5});
+    drawParagraph(`Fundão, ${dataAssinatura}.`, {align:"center", after:LEAD*2.5});
 
-    drawSignature("Ian Felisberto Villefort");
-    cy += LEAD * 5;
+    drawSignature(loc.nome);
+    cy += LEAD * 2;
     drawSignature(f.nome);
 
     // Output
@@ -2093,10 +2252,168 @@ async function generateContractPDF(){
     err.textContent="Erro: "+e.message; err.style.display="block";
     console.error(e);
   }finally{
-    if(origBtn){ origBtn.disabled=false; origBtn.textContent="📄 Gerar contrato PDF"; }
+    if(origBtn){ origBtn.disabled=false; origBtn.textContent="📄 Gerar PDF"; }
   }
 }
-// ── ALUGUEL ────────────────────────────────────────────────────────────────
+
+// ── CONTRATO DOCX ──────────────────────────────────────────────────────────
+async function generateContractDOCX(){
+  const err = document.getElementById("ct-error");
+  err.style.display="none";
+
+  const f = {
+    nome:      document.getElementById("ct-nome").value.trim(),
+    nac:       document.getElementById("ct-nac").value.trim(),
+    ecivil:    document.getElementById("ct-ecivil").value.trim(),
+    prof:      document.getElementById("ct-prof").value.trim(),
+    rg:        document.getElementById("ct-rg").value.trim(),
+    cpf:       document.getElementById("ct-cpf").value.trim(),
+    rua:       document.getElementById("ct-rua").value.trim(),
+    bairro:    document.getElementById("ct-bairro").value.trim(),
+    numend:    document.getElementById("ct-numend").value.trim(),
+    cep:       document.getElementById("ct-cep").value.trim(),
+    cidade:    document.getElementById("ct-cidade").value.trim(),
+    estado:    document.getElementById("ct-estado").value.trim(),
+    numimovel: document.getElementById("ct-numimovel").value.trim(),
+    valor:     document.getElementById("ct-valor").value.trim(),
+    comercio:  document.getElementById("ct-comercio").value.trim(),
+    datainicio:document.getElementById("ct-datainicio").value.trim(),
+  };
+  const obrigatorios = ["nome","nac","ecivil","prof","rg","cpf","rua","bairro","numend","cep","cidade","estado","numimovel","valor","comercio","datainicio"];
+  for(const k of obrigatorios){
+    if(!f[k]){ err.textContent="Preencha todos os campos."; err.style.display="block"; return; }
+  }
+
+  // Load docx library if needed
+  if(!window.docx){
+    toast("⏳ Carregando biblioteca DOCX...");
+    await new Promise((res,rej)=>{
+      const s=document.createElement("script");
+      s.src="https://cdnjs.cloudflare.com/ajax/libs/docx/8.5.0/docx.umd.min.js";
+      s.onload=res; s.onerror=()=>rej(new Error("Falha ao carregar biblioteca DOCX"));
+      document.head.appendChild(s);
+    });
+  }
+
+  const [dd2,mm2,yr2] = f.datainicio.split("/").map(Number);
+  const dtFim = new Date(yr2, mm2-1+12, dd2-1);
+  const dataFim = String(dtFim.getDate()).padStart(2,"0")+"/"+String(dtFim.getMonth()+1).padStart(2,"0")+"/"+dtFim.getFullYear();
+  const valorTotal = (parseFloat(f.valor)*12).toLocaleString("pt-BR");
+  const meses2 = ["Janeiro","Fevereiro","Março","Abril","Maio","Junho","Julho","Agosto","Setembro","Outubro","Novembro","Dezembro"];
+  const hoje2 = new Date();
+  const dataAssinatura = String(hoje2.getDate()).padStart(2,"0")+" de "+meses2[hoje2.getMonth()]+" de "+hoje2.getFullYear();
+  const vedaBebidas = document.querySelector('input[name="ct-bebidas"]:checked')?.value==="sim"
+    ? "nem a venda de bebidas alcoólicas e " : "";
+  const renovacao = document.querySelector('input[name="ct-renovacao"]:checked')?.value === "sim";
+  const clauseII = renovacao
+    ? `O prazo de locação é de prazo determinado de 12 meses, tendo início em ${f.datainicio} e término previsto para o dia ${dataFim}. O contrato por prazo determinado cessa, de pleno direito, findo o prazo estipulado, independentemente de notificação ou aviso. Caso, ao fim do contrato, o LOCATÁRIO continuar no imóvel por mais de 30 (trinta) dias, sem oposição do LOCADOR, ficará a locação prorrogada automaticamente por prazo indeterminado, nas mesmas bases contratuais; Caso a locação tenha sido prorrogada por prazo indeterminado, o contrato poderá ser cancelado a qualquer momento, desde que respeitados os 30 dias de aviso prévio (artigo 57 da lei do inquilinato). Após o recebimento de pedido por escrito do LOCATÁRIO para encerramento do contrato, o LOCADOR terá o prazo de dez dias para efetuar a vistoria do imóvel, correndo por conta do LOCATÁRIO o aluguel até a efetiva devolução do imóvel ao LOCADOR.`
+    : `O prazo de locação é de prazo determinado de 12 meses, tendo início em ${f.datainicio} e término previsto para o dia ${dataFim}, data em que o LOCATÁRIO se obriga a restituir o imóvel desocupado ou de outra forma a renovar expressamente o contrato, caso seja da vontade de ambas as partes. O contrato por prazo determinado cessa, de pleno direito, findo o prazo estipulado, independentemente de notificação ou aviso (art. 573 CCB 2002).`;
+
+  const { Document, Paragraph, TextRun, HeadingLevel, AlignmentType, PageBreak,
+          Packer, BorderStyle, ShadingType } = window.docx;
+
+  const NL = () => new Paragraph({text:""});
+
+  function titlePara(txt){
+    return new Paragraph({
+      children:[new TextRun({text:txt, bold:true, size:22})],
+      alignment:AlignmentType.CENTER,
+      spacing:{after:200},
+    });
+  }
+
+  function bodyPara(txt, opts={}){
+    return new Paragraph({
+      children:[new TextRun({text:txt, size:18})],
+      alignment:AlignmentType.JUSTIFIED,
+      spacing:{after:opts.after||120},
+    });
+  }
+
+  function clausePara(title, body){
+    // Parse ***bold*** markers into TextRun segments
+    const runs = [];
+    const parts = body.split(/(\*\*\*.*?\*\*\*)/g);
+    parts.forEach(p => {
+      if(p.startsWith("***") && p.endsWith("***")){
+        runs.push(new TextRun({text:p.slice(3,-3), bold:true, size:18}));
+      } else if(p){
+        runs.push(new TextRun({text:p, size:18}));
+      }
+    });
+    return [
+      new Paragraph({
+        children:[new TextRun({text:title+":", bold:true, size:18})],
+        spacing:{before:160, after:80},
+      }),
+      new Paragraph({
+        children: runs,
+        alignment:AlignmentType.JUSTIFIED,
+        spacing:{after:120},
+      }),
+    ];
+  }
+
+  const clauses = [
+    ["I. OBJETO", `Constitui objeto do presente contrato a locação do imóvel situado na Rodovia Santa Cruz, ${f.numimovel}, Praia Grande, Fundão - ES, composto na parte em questão por 1 sala com aproximadamente 10 m².`],
+    ["II. PRAZO", clauseII],
+    ["III. FINALIDADE", `A sala comercial é locada para uso exclusivamente como ${f.comercio}, ***não podendo, o locatário, exercer outro ramo senão o aqui estipulado***, não sendo permitida a ocupação fora dos limites da sala${vedaBebidas ? ", nem a venda de bebidas alcoólicas" : ""}. Fumar no interior do estabelecimento também não é permitido.`],
+    ["IV. PREÇO E FORMA DE PAGAMENTO", `O valor do aluguel mensal é de ${f.valor} reais, a ser pago todo dia 10, totalizando ${valorTotal} reais ao longo dos 12 meses de contrato. Findo esse prazo, os valores podem sofrer reajuste, como especificado na cláusula de número VI.`],
+    ["V. ATRASO NO PAGAMENTO", `O não pagamento do aluguel no prazo ajustado na cláusula 4ª implicará em multa de 2% (dois por cento) sobre o valor do débito, juros de 1% (um por cento) ao mês e correção monetária.`],
+    ["VI. REAJUSTE DO ALUGUEL", `O aluguel pactuado na cláusula anterior poderá sofrer reajustes anuais com base na variação do Índice Nacional de Preços ao Consumidor Amplo (IPCA) ou outro índice que porventura venha a substituí-lo. O aluguel não poderá sofrer reajuste acima dos índices, a não ser que seja expressamente com a finalidade de ajustar o valor ao nível de mercado atual.`],
+    ["VII. ALVARÁ DE VISTORIA DO CORPO DE BOMBEIROS", `O LOCATÁRIO obriga-se, às suas expensas, a providenciar, obter e manter válido durante toda a vigência do contrato o Alvará do Corpo de Bombeiros (AVCB) exigido pela legislação vigente, de acordo com a atividade exercida no imóvel. O LOCATÁRIO compromete-se ainda a renovar o referido alvará sempre que necessário, bem como a adequar o imóvel às exigências técnicas do Corpo de Bombeiros, assumindo integral responsabilidade por eventuais adequações, instalações, equipamentos e manutenções exigidas, desde que compatíveis com o uso contratado. A não obtenção, não renovação ou vencimento do Alvará do Corpo de Bombeiros caracterizará infração contratual grave, sujeitando o LOCATÁRIO à rescisão contratual. O LOCATÁRIO declara ciência de que nenhuma atividade poderá ser exercida no imóvel em desacordo com as normas de segurança, isentando o LOCADOR de qualquer responsabilidade decorrente do descumprimento desta obrigação.`],
+    ["VIII. BENFEITORIAS, ALTERAÇÕES E USO DO IMÓVEL", `Qualquer alteração, intervenção ou adaptação nas instalações elétricas ou hidráulicas do imóvel somente poderá ser realizada mediante prévia e expressa autorização do LOCADOR. As intervenções deverão ser executadas por profissionais legalmente habilitados, aprovados ou indicados pelo LOCADOR. Fica a cargo do locatário a decoração, manutenção e escolha da decoração interna do imóvel. Fica a cargo do locatário a preservação da fachada sem que faça alterações no exterior do imóvel, a não ser por uma placa que identifique o estabelecimento. O locatário obriga-se a manter o imóvel locado em boas condições de higiene, limpeza e conservação, mantendo em perfeito estado as suas instalações elétricas e hidráulicas, a fim de restituí-lo no estado em que recebeu. O locador obriga-se a garantir a segurança estrutural do imóvel, assim como suas demais obrigações legais. O locatário renuncia expressamente ao direito de indenização e ao exercício do direito de retenção por quaisquer benfeitorias introduzidas no imóvel, sejam elas necessárias, úteis ou voluptuárias, nos termos do art. 35 da Lei nº 8.245/91.`],
+    ["IX. EXIGÊNCIAS DOS PODERES PÚBLICOS", `Obriga-se o locatário a satisfazer a todas as exigências dos poderes públicos a que der causa.`],
+    ["X. CESSÃO, SUBLOCAÇÃO E EMPRÉSTIMO", `O locatário não poderá transferir este contrato, ceder, emprestar, ou sublocar o imóvel no todo ou em parte, sem prévia autorização por escrito do locador.`],
+    ["XI. DESPESAS DE CONDOMÍNIO, CONSUMO E TAXAS", `Todas as despesas decorrentes da locação, quais sejam, consumo de água, luz, telefone e gás, ficam a cargo do locatário, cabendo-lhe efetuar diretamente esses pagamentos nas devidas épocas. O valor será acordado entre taxa mínima ou medição, de acordo com o nível do consumo.`],
+    ["XII. VISTORIA", `O locatário desde já faculta ao locador examinar ou vistoriar o prédio, sempre que o segundo entender conveniente, desde que previamente acordados dia e hora.`],
+    ["XIII. DEVOLUÇÃO DO IMÓVEL", `É de responsabilidade do locatário a devolução do imóvel em boas condições, sem danos ao piso, paredes e instalações. Em caso de entrega com dano carente de reforma em que o locatário falhe em reparar por conta própria, será contratado um prestador de serviços terceiro, com valor a ser pago pelo locatário.`],
+    ["XIV. FORO", `Para todas as questões decorrentes deste contrato, será competente o foro da situação do imóvel, seja qual for o domicílio dos contratantes.`],
+  ];
+
+  function sigBlock(name){
+    return [
+      NL(), NL(),
+      new Paragraph({
+        children:[new TextRun({text:"_".repeat(52), size:18})],
+        alignment:AlignmentType.CENTER,
+      }),
+      new Paragraph({
+        children:[new TextRun({text:name, size:18})],
+        alignment:AlignmentType.CENTER,
+        spacing:{after:80},
+      }),
+    ];
+  }
+
+  const doc2 = new Document({
+    sections:[{
+      properties:{},
+      children:[
+        titlePara("Contrato de Locação não residencial"),
+        bodyPara(`Pelo presente instrumento particular, de um lado, como LOCADOR, ${LOCADORES[selectedLocador].nome}, RG(CIN) ${LOCADORES[selectedLocador].rg}, CPF ${LOCADORES[selectedLocador].cpf}, ${LOCADORES[selectedLocador].nac}, ${LOCADORES[selectedLocador].ecivil}, ${LOCADORES[selectedLocador].prof}, residente e domiciliado no endereço ${LOCADORES[selectedLocador].end} e, de outro lado, como LOCATÁRIO, ${f.nome}, ${f.nac}, ${f.ecivil}, ${f.prof}, RG ${f.rg}, inscrito sob o CPF ${f.cpf}, residente e domiciliado em ${f.rua}, ${f.numend}, ${f.bairro} - ${f.cidade} ${f.estado} - CEP ${f.cep}, resolvem celebrar o presente contrato de locação, o qual reger-se-á pelas seguintes cláusulas e condições:`, {after:200}),
+        ...clauses.flatMap(([t,b])=>clausePara(t,b)),
+        NL(),
+        bodyPara("E, por estarem, assim ajustados, assinam o presente contrato.", {after:200}),
+        new Paragraph({
+          children:[new TextRun({text:`Fundão, ${dataAssinatura}.`, size:18})],
+          alignment:AlignmentType.CENTER,
+          spacing:{after:400},
+        }),
+        ...sigBlock(LOCADORES[selectedLocador].nome),
+        ...sigBlock(f.nome),
+      ],
+    }],
+  });
+
+  const blob = await Packer.toBlob(doc2);
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement("a");
+  a.href=url; a.download=`Contrato_${f.nome.split(" ")[0]}.docx`;
+  document.body.appendChild(a); a.click(); document.body.removeChild(a);
+  setTimeout(()=>URL.revokeObjectURL(url),1000);
+  toast("✅ Contrato DOCX gerado!");
+}
 function toggleRentalText(){
   const full = document.getElementById("rental-full-text");
   const preview = document.getElementById("rental-preview");
@@ -2754,6 +3071,64 @@ function toggleTheme(){
     });
   }
 })();
+
+// ── DADOS DEMO ────────────────────────────────────────────────────────────────
+function fillDummy(){
+  if(S.tenants.length > 0){
+    if(!confirm('O app já tem dados. Substituir tudo por dados de exemplo?')) return;
+  }
+
+  const prev2 = (k=>{ const[y,m]=k.split('-').map(Number); return m===1?`${y-1}-12`:`${y}-${String(m-1).padStart(2,'0')}`; })(PREV);
+
+  S.tenants = [
+    { id:1001, name:'Carlos Mendonça',  unit:'Sala 01', phone:'5527999110001', serial:'98647144', active:true  },
+    { id:1002, name:'Fernanda Lima',    unit:'Sala 02', phone:'5527999110002', serial:'21584080', active:true  },
+    { id:1003, name:'Ricardo Alves',    unit:'Sala 03', phone:'5527999110003', serial:'30012775', active:true  },
+    { id:1004, name:'Patrícia Souza',   unit:'Sala 04', phone:'5527999110004', serial:'44561230', active:true  },
+    { id:1005, name:'Eduardo Teixeira', unit:'Sala 05', phone:'5527999110005', serial:'55098712', active:false },
+  ];
+
+  S.readings = {
+    1001:[ {month:prev2,value:5510},{month:PREV,value:5820},{month:CUR,value:6092} ],
+    1002:[ {month:prev2,value:11935},{month:PREV,value:12340},{month:CUR,value:12718} ],
+    1003:[ {month:prev2,value:3003},{month:PREV,value:3201},{month:CUR,value:3415} ],
+    1004:[ {month:prev2,value:8345},{month:PREV,value:8625} ],
+    1005:[ {month:prev2,value:1900},{month:PREV,value:2100},{month:CUR,value:2280} ],
+  };
+
+  const edpCur  = { kwh:1950, total_brl:2340.18, costPerKwh:1.20 };
+  const edpPrev = { kwh:1820, total_brl:2134.40, costPerKwh:1.17 };
+  const edpPrev2= { kwh:1760, total_brl:2002.56, costPerKwh:1.14 };
+  S.edp = edpCur;
+  S.edpHistory[CUR]   = {...edpCur};
+  S.edpHistory[PREV]  = {...edpPrev};
+  S.edpHistory[prev2] = {...edpPrev2};
+
+  S.charges = {
+    1001:{ diff:272, amount:+(272*1.20).toFixed(2), status:'approved'   },
+    1002:{ diff:378, amount:+(378*1.20).toFixed(2), status:'sent'       },
+    1003:{ diff:214, amount:+(214*1.20).toFixed(2), status:'calculated' },
+  };
+  S.chargesHistory[CUR]   = JSON.parse(JSON.stringify(S.charges));
+  S.chargesHistory[PREV]  = {
+    1001:{ diff:310, amount:+(310*1.17).toFixed(2), status:'sent' },
+    1002:{ diff:405, amount:+(405*1.17).toFixed(2), status:'sent' },
+    1003:{ diff:198, amount:+(198*1.17).toFixed(2), status:'sent' },
+    1004:{ diff:280, amount:+(280*1.17).toFixed(2), status:'sent' },
+  };
+  S.chargesHistory[prev2] = {
+    1001:{ diff:295, amount:+(295*1.14).toFixed(2), status:'sent' },
+    1002:{ diff:388, amount:+(388*1.14).toFixed(2), status:'sent' },
+    1003:{ diff:221, amount:+(221*1.14).toFixed(2), status:'sent' },
+    1004:{ diff:260, amount:+(260*1.14).toFixed(2), status:'sent' },
+  };
+
+  // NÃO salva no localStorage nem no Drive — dados ficam só na memória
+  S._demo = true;
+  render();
+  toast('🎲 Dados de exemplo carregados — não serão salvos no Drive');
+}
+// ── FIM DADOS DEMO ─────────────────────────────────────────────────────────────
 
 </script>
 </body>
