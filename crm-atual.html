@@ -922,6 +922,35 @@ async function claude(messages){
   throw new Error("Sem JSON na resposta: "+raw.slice(0,150));
 }
 
+// ── Extrai mês de referência do nome do arquivo (fallback) ─────────────────
+// Suporta: EDP_2025-06.pdf · EDP-2025-06.pdf · fatura_06_2025.pdf · jun2025
+function monthFromFilename(name){
+  if(!name) return null;
+  // "2025-06" ou "2025_06"
+  let m = name.match(/(\d{4})[-_](\d{2})/);
+  if(m && +m[2]>=1 && +m[2]<=12) return m[1]+"-"+m[2];
+  // "06-2025" ou "06_2025"
+  m = name.match(/(\d{2})[-_](\d{4})/);
+  if(m && +m[1]>=1 && +m[1]<=12) return m[2]+"-"+m[1];
+  return null;
+}
+
+// Decide o mês alvo: prefere o que veio do PDF, fallback nome do arquivo,
+// fallback CUR. Se for diferente de CUR, troca o mês ativo automaticamente
+// e avisa via toast (sem confirm — não interrompe o fluxo).
+function resolveTargetMonth(refMonthFromPDF, filename){
+  const fromFile = monthFromFilename(filename);
+  const target = refMonthFromPDF || fromFile || null;
+  if(!target) return CUR; // não detectou — usa o mês aberto
+
+  if(target !== CUR){
+    console.log(`EDP: mês detectado (${target}) ≠ mês aberto (${CUR}). Trocando automaticamente.`);
+    changeMonth(target);
+    toast(`📅 Conta de ${mlbl(target)} — mês atualizado automaticamente.`);
+  }
+  return target;
+}
+
 // ── PDF → TEXT → CLAUDE ────────────────────────────────────────────────────
 async function extractPDFText(file){
   const buf = await file.arrayBuffer();
@@ -943,7 +972,7 @@ function parseEDPFromText(text){
     .replace(/\s+/g, " ");
   console.log("PDF text (norm):", norm.slice(0,400));
 
-  let kwh=null, brl=null;
+  let kwh=null, brl=null, refMonth=null;
 
   // kWh: number right after "TUSD - Consumo kWh" or "TUSD Consumo"
   const m1 = norm.match(/TUSD\s*-?\s*Consumo\s*kWh\s+([\d]+)/i);
@@ -958,7 +987,35 @@ function parseEDPFromText(text){
     || norm.match(/R\$\s*([1-9]\d{2,5}\.\d{2})/);
   if(m3) brl = parseFloat(m3[1]);
 
-  return {kwh, brl};
+  // ── Mês de referência da conta ──────────────────────────────────────────
+  // Padrões EDP: "Referente a 06/2025", "Competência 06/2025",
+  //              "MÊS DE REFERÊNCIA 06/2025", vencimento "dd/mm/yyyy" (conta
+  //              vence no mês seguinte ao de consumo — usamos mês anterior)
+  const rawText = text.replace(/\s+/g, " ");
+
+  // 1) "Referente a mm/yyyy" ou "Competência mm/yyyy" (mais confiável)
+  const rRef = rawText.match(/(?:Referente\s+a|Compet[eê]ncia|M[EÊ]S\s+DE\s+REFER[EÊ]NCIA)[:\s]+(\d{2})\/(\d{4})/i);
+  if(rRef){
+    refMonth = rRef[2]+"-"+rRef[1]; // "2025-06"
+  }
+
+  // 2) "Período de consumo: dd/mm/yyyy a dd/mm/yyyy" — pega o mês do início
+  if(!refMonth){
+    const rPer = rawText.match(/Per[ií]odo\s+de\s+consumo[:\s]+\d{2}\/(\d{2})\/(\d{4})/i);
+    if(rPer) refMonth = rPer[2]+"-"+rPer[1];
+  }
+
+  // 3) Vencimento "dd/mm/yyyy" — conta EDP vence ~30 dias após o consumo,
+  //    portanto o mês de referência é o mês do vencimento (a EDP emite a
+  //    fatura com vencimento dentro do próprio mês de referência em muitos
+  //    casos, mas como pode variar usamos só se nenhum outro padrão bater)
+  if(!refMonth){
+    const rVenc = rawText.match(/Vencimento[:\s]+(\d{2})\/(\d{2})\/(\d{4})/i);
+    if(rVenc) refMonth = rVenc[3]+"-"+rVenc[2];
+  }
+
+  console.log("Mês de referência detectado no PDF:", refMonth);
+  return {kwh, brl, refMonth};
 }
 
 async function pdfToBase64Image(file){
@@ -997,7 +1054,9 @@ async function handleEDP(input){
     try{
       // Try text extraction first (accurate, no API cost)
       const pdfText = await extractPDFText(file);
-      const {kwh, brl} = parseEDPFromText(pdfText);
+      const {kwh, brl, refMonth} = parseEDPFromText(pdfText);
+      // Resolve the correct target month BEFORE filling the form
+      resolveTargetMonth(refMonth, file.name);
       if(kwh && brl){
         document.getElementById("edp-k").value=kwh;
         document.getElementById("edp-v").value=brl;
@@ -1028,6 +1087,8 @@ async function handleEDP(input){
   } else {
     // IMAGE (print/foto) — vai direto para Claude via visão
     ut.innerHTML='<span class="spin"></span> Analisando imagem com IA...';
+    // Tenta detectar mês pelo nome do arquivo antes de enviar para IA
+    resolveTargetMonth(null, file.name);
     try{
       const b64 = await fileToB64(file);
       const res = await claude([{role:"user",content:[
@@ -1810,7 +1871,10 @@ async function checkEDPPendente(){
 
     toast("⏳ Lendo PDF...");
     const pdfText = await extractPDFText(pdfFile);
-    const {kwh, brl} = parseEDPFromText(pdfText);
+    const {kwh, brl, refMonth} = parseEDPFromText(pdfText);
+
+    // Resolve (and switch to) the correct month BEFORE saving anything
+    resolveTargetMonth(refMonth, pendente.pdfNome||pdfFile.name);
 
     if(kwh && brl){
       S.edp={kwh,total_brl:brl,costPerKwh:brl/kwh};
