@@ -9,6 +9,7 @@
 <title>EnergiaCRM</title>
 <script src="https://accounts.google.com/gsi/client" async></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/html2pdf.js/0.10.1/html2pdf.bundle.min.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js"></script>
 <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500&display=swap" rel="stylesheet"/>
@@ -726,7 +727,7 @@ function shiftMonth(delta){
 
 // ── PERSIST ────────────────────────────────────────────────────────────────
 function saveState(){
-  if(S._demo) return; // modo demo — não persiste
+  if(S._demo) return;
   const data = {
     tenants: S.tenants,
     readings: S.readings,
@@ -734,14 +735,20 @@ function saveState(){
     chargesHistory: S.chargesHistory,
     photoHistory: S.photoHistory,
     edpPendente: S.edpPendente || null,
+    _savedAt: Date.now(), // timestamp para merge inteligente
   };
+  // 1) localStorage (primário)
   try { localStorage.setItem("energiacrm_data", JSON.stringify(data)); }
-  catch(e){ console.warn("Storage full, saving without photos"); 
+  catch(e){
     const lite = {...data, photoHistory:{}};
-    localStorage.setItem("energiacrm_data", JSON.stringify(lite));
+    try { localStorage.setItem("energiacrm_data", JSON.stringify(lite)); } catch(_){}
   }
+  // 2) IndexedDB (backup local — mais robusto, não é limpo pelo browser)
+  idbSave(data);
+  // 3) Drive (remoto) com debounce
   driveSaveDebounced();
 }
+
 function loadState(){
   try{
     const raw = localStorage.getItem("energiacrm_data");
@@ -752,15 +759,65 @@ function loadState(){
     if(data.edpHistory) S.edpHistory = data.edpHistory;
     if(data.chargesHistory) S.chargesHistory = data.chargesHistory;
     if(data.photoHistory) S.photoHistory = data.photoHistory;
-    // Check for pending EDP from email monitor
-    if(data.edpPendente){
-      S.edpPendente = data.edpPendente;
-    }
-    // Restore current month EDP and charges if saved
+    if(data.edpPendente) S.edpPendente = data.edpPendente;
     if(S.edpHistory[CUR]) S.edp = S.edpHistory[CUR];
     if(S.chargesHistory[CUR]) S.charges = S.chargesHistory[CUR];
   }catch(e){ console.error("loadState error:", e); }
 }
+
+// ── INDEXEDDB BACKUP ────────────────────────────────────────────────────────
+const IDB_NAME = "energiacrm", IDB_STORE = "state", IDB_KEY = "main";
+let _idb = null;
+function idbOpen(){
+  return new Promise((res,rej)=>{
+    if(_idb){ res(_idb); return; }
+    const req = indexedDB.open(IDB_NAME, 1);
+    req.onupgradeneeded = e => e.target.result.createObjectStore(IDB_STORE);
+    req.onsuccess = e => { _idb=e.target.result; res(_idb); };
+    req.onerror = e => rej(e);
+  });
+}
+async function idbSave(data){
+  try{
+    const db = await idbOpen();
+    const tx = db.transaction(IDB_STORE,"readwrite");
+    tx.objectStore(IDB_STORE).put(data, IDB_KEY);
+  }catch(e){ console.warn("idbSave error:", e); }
+}
+async function idbLoad(){
+  try{
+    const db = await idbOpen();
+    return new Promise((res,rej)=>{
+      const tx = db.transaction(IDB_STORE,"readonly");
+      const req = tx.objectStore(IDB_STORE).get(IDB_KEY);
+      req.onsuccess = e => res(e.target.result || null);
+      req.onerror = e => rej(e);
+    });
+  }catch(e){ return null; }
+}
+// Carrega do IndexedDB se localStorage estiver vazio ou mais antigo
+async function loadStateWithFallback(){
+  loadState(); // tenta localStorage primeiro
+  const localSavedAt = (() => {
+    try{ const r=localStorage.getItem("energiacrm_data"); return r?JSON.parse(r)._savedAt||0:0; }catch(_){ return 0; }
+  })();
+  const idbData = await idbLoad();
+  if(idbData && (idbData._savedAt||0) > localSavedAt){
+    console.log("IndexedDB mais recente que localStorage — restaurando...");
+    if(idbData.tenants) S.tenants = idbData.tenants;
+    if(idbData.readings) S.readings = idbData.readings;
+    if(idbData.edpHistory) S.edpHistory = idbData.edpHistory;
+    if(idbData.chargesHistory) S.chargesHistory = idbData.chargesHistory;
+    if(idbData.photoHistory) S.photoHistory = idbData.photoHistory;
+    if(idbData.edpPendente) S.edpPendente = idbData.edpPendente;
+    if(S.edpHistory[CUR]) S.edp = S.edpHistory[CUR];
+    if(S.chargesHistory[CUR]) S.charges = S.chargesHistory[CUR];
+    // Sincroniza localStorage com IndexedDB
+    try{ localStorage.setItem("energiacrm_data", JSON.stringify(idbData)); }catch(_){}
+    render();
+  }
+}
+
 
 let meterTid = null;
 let edpTempPreview = null; // {b64, mime} stored until confirmEDP
@@ -1882,37 +1939,44 @@ async function driveSave(){
   if(S._demo){ toast('⚠️ Modo demo — dados não são salvos no Drive', true); return; }
   GDRIVE.syncing = true;
   driveSetStatus("sync","salvando...");
-  try{
-    const data = {
-      tenants:S.tenants, readings:S.readings,
-      edpHistory:S.edpHistory, chargesHistory:S.chargesHistory,
-      photoHistory:S.photoHistory
-    };
-    const blob = new Blob([JSON.stringify(data)],{type:"application/json"});
-    const form = new FormData();
-    form.append("metadata", new Blob([JSON.stringify({name:GDRIVE.FILE_NAME,mimeType:"application/json"})],{type:"application/json"}));
-    form.append("file", blob);
-
-    const r = await driveFetch(
-      `https://www.googleapis.com/upload/drive/v3/files/${GDRIVE.fileId}?uploadType=multipart`,
-      {method:"PATCH", body:form}
-    );
-    if(r && r.ok){
-      const now = new Date().toLocaleTimeString("pt-BR",{hour:"2-digit",minute:"2-digit"});
-      driveSetStatus("ok","salvo às "+now);
-      // Update lastDriveModified so backgroundSync won't mistake our own
-      // save as a remote change and immediately overwrite in-memory state.
-      try{
-        const meta = await driveFetch(
-          `https://www.googleapis.com/drive/v3/files/${GDRIVE.fileId}?fields=modifiedTime&t=${Date.now()}`
-        );
-        if(meta && meta.ok){ const j=await meta.json(); if(j.modifiedTime) lastDriveModified=j.modifiedTime; }
-      }catch(_){}
-    } else {
-      driveSetStatus("err","erro ao salvar");
+  const data = {
+    tenants:S.tenants, readings:S.readings,
+    edpHistory:S.edpHistory, chargesHistory:S.chargesHistory,
+    photoHistory:S.photoHistory,
+    _savedAt: Date.now(),
+  };
+  let ok = false;
+  for(let attempt=1; attempt<=3; attempt++){
+    try{
+      const blob = new Blob([JSON.stringify(data)],{type:"application/json"});
+      const form = new FormData();
+      form.append("metadata", new Blob([JSON.stringify({name:GDRIVE.FILE_NAME,mimeType:"application/json"})],{type:"application/json"}));
+      form.append("file", blob);
+      const r = await driveFetch(
+        `https://www.googleapis.com/upload/drive/v3/files/${GDRIVE.fileId}?uploadType=multipart`,
+        {method:"PATCH", body:form}
+      );
+      if(r && r.ok){
+        ok = true;
+        const now = new Date().toLocaleTimeString("pt-BR",{hour:"2-digit",minute:"2-digit"});
+        driveSetStatus("ok","salvo às "+now);
+        try{
+          const meta = await driveFetch(
+            `https://www.googleapis.com/drive/v3/files/${GDRIVE.fileId}?fields=modifiedTime&t=${Date.now()}`
+          );
+          if(meta && meta.ok){ const j=await meta.json(); if(j.modifiedTime) lastDriveModified=j.modifiedTime; }
+        }catch(_){}
+        break;
+      }
+    }catch(e){
+      console.warn(`driveSave tentativa ${attempt} falhou:`, e.message);
+      if(attempt < 3) await new Promise(r=>setTimeout(r, attempt*2000)); // espera 2s, 4s
     }
-  }catch(e){
-    driveSetStatus("err","erro: "+e.message);
+  }
+  if(!ok){
+    driveSetStatus("err","erro ao salvar — tentando novamente em 30s");
+    // agenda retry
+    setTimeout(()=>{ if(GDRIVE.token && GDRIVE.fileId) driveSave(); }, 30000);
   }
   GDRIVE.syncing=false;
 }
@@ -1928,16 +1992,47 @@ async function driveLoad(){
     const text = await r.text();
     if(!text || text.trim()===""){driveSetStatus("ok","pronto (vazio)");return;}
     const data = JSON.parse(text);
-    if(data.tenants) S.tenants=data.tenants;
-    if(data.readings) S.readings=data.readings;
-    if(data.edpHistory) S.edpHistory=data.edpHistory;
-    if(data.chargesHistory) S.chargesHistory=data.chargesHistory;
-    if(data.photoHistory) S.photoHistory=data.photoHistory;
-    // Preserve edpPendente from Drive (set by Apps Script)
-    if(data.edpPendente) S.edpPendente=data.edpPendente;
-    // Restore or clear current month EDP based on what's in Drive
+
+    // Merge inteligente: nunca sobrescreve leituras locais mais recentes
+    const localSavedAt = (() => {
+      try{ const raw=localStorage.getItem("energiacrm_data"); return raw?JSON.parse(raw)._savedAt||0:0; }catch(_){ return 0; }
+    })();
+    const remoteSavedAt = data._savedAt || 0;
+
+    if(localSavedAt > remoteSavedAt && localSavedAt - remoteSavedAt < 5*60*1000){
+      // Local é mais recente por menos de 5 min — merge por readings (une os dois)
+      console.log("driveLoad: local mais recente, fazendo merge de readings");
+      if(data.tenants) S.tenants = data.tenants;
+      // Merge readings: mantém o mais recente por inquilino/mês
+      if(data.readings){
+        Object.keys(data.readings).forEach(tid=>{
+          if(!S.readings[tid]) S.readings[tid]=[];
+          (data.readings[tid]||[]).forEach(remoteRd=>{
+            const localRd = (S.readings[tid]||[]).find(r=>r.month===remoteRd.month);
+            if(!localRd) S.readings[tid].push(remoteRd); // só adiciona se não existe localmente
+          });
+        });
+      }
+      if(data.edpHistory) S.edpHistory = {...data.edpHistory, ...S.edpHistory};
+      if(data.chargesHistory) S.chargesHistory = {...data.chargesHistory, ...S.chargesHistory};
+      if(data.photoHistory) S.photoHistory = {...(data.photoHistory||{}), ...S.photoHistory};
+      if(data.edpPendente && !S.edpPendente) S.edpPendente = data.edpPendente;
+      // Salva o merge de volta no Drive imediatamente
+      saveState();
+    } else {
+      // Drive é mais recente ou diferença grande — usa Drive como fonte da verdade
+      if(data.tenants) S.tenants=data.tenants;
+      if(data.readings) S.readings=data.readings;
+      if(data.edpHistory) S.edpHistory=data.edpHistory;
+      if(data.chargesHistory) S.chargesHistory=data.chargesHistory;
+      if(data.photoHistory) S.photoHistory=data.photoHistory;
+      if(data.edpPendente) S.edpPendente=data.edpPendente;
+    }
+
     S.edp = S.edpHistory[CUR] || null;
     S.charges = S.chargesHistory[CUR] ? JSON.parse(JSON.stringify(S.chargesHistory[CUR])) : {};
+    // Atualiza localStorage e IndexedDB com dados do Drive
+    saveState();
     const now = new Date().toLocaleTimeString("pt-BR",{hour:"2-digit",minute:"2-digit"});
     driveSetStatus("ok","carregado às "+now);
     render();
@@ -2080,7 +2175,7 @@ function driveSaveDebounced(){
   // Load local state only if Drive is NOT connected (offline fallback)
   // If Drive is connected, skip localStorage and wait for Drive data
   if(!savedDriveToken){
-    loadState();
+    loadStateWithFallback(); // tenta localStorage + IndexedDB
   }
 
   // Set month label
@@ -2210,6 +2305,7 @@ async function generateContractPDF(){
   if(origBtn){ origBtn.disabled=true; origBtn.textContent="⏳ Gerando..."; }
 
   try{
+    const {jsPDF} = window.jspdf;
     const [d,m,yr] = f.datainicio.split("/").map(Number);
     const dtFim = new Date(yr, m-1+12, d-1);
     const dataFim = String(dtFim.getDate()).padStart(2,"0")+"/"+String(dtFim.getMonth()+1).padStart(2,"0")+"/"+dtFim.getFullYear();
@@ -2218,164 +2314,92 @@ async function generateContractPDF(){
     const renovacao = document.querySelector('input[name="ct-renovacao"]:checked')?.value === "sim";
     const clauseII = renovacao
       ? `O prazo de locação é de prazo determinado de 12 meses, tendo início em ${f.datainicio} e término previsto para o dia ${dataFim}. O contrato por prazo determinado cessa, de pleno direito, findo o prazo estipulado, independentemente de notificação ou aviso. Caso, ao fim do contrato, o LOCATÁRIO continuar no imóvel por mais de 30 (trinta) dias, sem oposição do LOCADOR, ficará a locação prorrogada automaticamente por prazo indeterminado, nas mesmas bases contratuais; Caso a locação tenha sido prorrogada por prazo indeterminado, o contrato poderá ser cancelado a qualquer momento, desde que respeitados os 30 dias de aviso prévio (artigo 57 da lei do inquilinato). Após o recebimento de pedido por escrito do LOCATÁRIO para encerramento do contrato, o LOCADOR terá o prazo de dez dias para efetuar a vistoria do imóvel, correndo por conta do LOCATÁRIO o aluguel até a efetiva devolução do imóvel ao LOCADOR.`
-      : `O prazo de locação é de prazo determinado de 12 meses, tendo início em ${f.datainicio} e término previsto para o dia ${dataFim}, data em que o LOCATÁRIO se obriga a restituir o imóvel desocupado ou de outra forma a renovar expressamente o contrato, caso seja da vontade de ambas as partes. O contrato por prazo determinado cessa, de pleno direito, findo o prazo estipulado, independentemente de notificação ou aviso (art. 573 CCB 2002).`;
+      : `O prazo de locação é de prazo determinado de 12 meses, tendo início em ${f.datainicio} e término previsto para o dia ${dataFim}, data em que o LOCATÁRIO se obriga a restituir o imóvel desocupado ou de outra forma a renovar expressamente o contrato, caso seja da vontade de ambas as partes. O contrato por prazo determinado cessa, de pleno direito, findo o prazo estipulado, independentemente de notificação ou aviso (art. 573 CCB 2002).`;
     const meses = ["Janeiro","Fevereiro","Março","Abril","Maio","Junho","Julho","Agosto","Setembro","Outubro","Novembro","Dezembro"];
     const hoje = new Date();
     const dataAssinatura = String(hoje.getDate()).padStart(2,"0")+" de "+meses[hoje.getMonth()]+" de "+hoje.getFullYear();
+    const loc = LOCADORES[selectedLocador];
 
-    const { jsPDF } = window.jspdf;
     const doc = new jsPDF({orientation:"portrait", unit:"mm", format:"a4"});
-
-    const PW = 210, PH = 297;
-    const ML = 22, MR = 22, MT = 22, MB = 22;
-    const TW = PW - ML - MR;
-    const FS = 9.5;
-    const LEAD = 4.8;
-
-    doc.setFont("helvetica","normal");
-    doc.setFontSize(FS);
+    const PW=210, PH=297, ML=22, MR=22, MT=22, MB=22, TW=210-22-22, FS=9.5, LEAD=4.8;
+    doc.setFont("helvetica","normal"); doc.setFontSize(FS);
     let cy = MT;
 
-    function newPageIfNeeded(h){
-      if(cy + h > PH - MB){ doc.addPage(); cy = MT; }
-    }
+    function newPage(){ doc.addPage(); cy=MT; }
+    function check(h){ if(cy+h>PH-MB) newPage(); }
 
-    function drawParagraph(text, options={}){
-      const bold = options.bold||false;
-      const align = options.align||"left";
-      const after = options.after!==undefined ? options.after : LEAD;
-      const sz = options.size||FS;
-      doc.setFont("helvetica", bold?"bold":"normal");
-      doc.setFontSize(sz);
+    function para(text, opts={}){
+      const bold=opts.bold||false, center=opts.center||false, sz=opts.sz||FS, after=opts.after??LEAD;
+      doc.setFont("helvetica", bold?"bold":"normal"); doc.setFontSize(sz);
       const lines = doc.splitTextToSize(text, TW);
-      lines.forEach(line => {
-        newPageIfNeeded(LEAD);
-        if(align==="center"){
-          doc.text(line, PW/2, cy, {align:"center"});
-        } else {
-          doc.text(line, ML, cy);
-        }
-        cy += LEAD;
-      });
-      cy += after;
+      lines.forEach(l=>{ check(LEAD); doc.text(l, center?PW/2:ML, cy, center?{align:"center"}:{}); cy+=LEAD; });
+      cy+=after; doc.setFont("helvetica","normal"); doc.setFontSize(FS);
     }
 
-    function drawClause(roman, text){
-      doc.setFontSize(FS);
-
-      // Check if text has bold markers
-      const hasBold = text.includes("***");
+    function clause(roman, body){
+      const segs = [];
+      body.split(/(\*\*\*[\s\S]*?\*\*\*)/).forEach(p => {
+        if(p.startsWith("***") && p.endsWith("***")) segs.push({t:p.slice(3,-3), b:true});
+        else if(p) segs.push({t:p, b:false});
+      });
+      const hasBold = segs.some(s => s.b);
+      const prefix = roman + ": ";
+      doc.setFont("helvetica","bold");
+      const prefW = doc.getTextWidth(prefix) + 1;
 
       if(!hasBold){
-        // Simple case: no inline bold — just use splitTextToSize, draw line by line
-        const prefix = roman + ": ";
-        const full = prefix + text;
-        const lines = doc.splitTextToSize(full, TW);
-        lines.forEach((line, i) => {
-          newPageIfNeeded(LEAD);
-          if(i === 0){
-            // Draw prefix in bold, rest in normal, on same line
-            doc.setFont("helvetica","bold");
-            const pw = doc.getTextWidth(prefix);
-            doc.text(prefix, ML, cy);
-            doc.setFont("helvetica","normal");
-            const rest = line.slice(prefix.length);
-            if(rest) doc.text(rest, ML + pw, cy);
+        doc.setFont("helvetica","normal");
+        const firstLine = doc.splitTextToSize(body, TW - prefW)[0];
+        const restBody = body.slice(firstLine.length).trimStart();
+        const restLines = restBody ? doc.splitTextToSize(restBody, TW) : [];
+        [firstLine, ...restLines].forEach((line, i) => {
+          check(LEAD);
+          if(i===0){
+            doc.setFont("helvetica","bold"); doc.text(prefix, ML, cy);
+            doc.setFont("helvetica","normal"); if(line) doc.text(line, ML+prefW, cy);
           } else {
-            doc.setFont("helvetica","normal");
-            doc.text(line, ML, cy);
+            doc.setFont("helvetica","normal"); doc.text(line, ML, cy);
           }
           cy += LEAD;
         });
       } else {
-        // Inline bold: split text around *** markers into plain segments
-        // Build plain version for line-breaking, then re-draw with bold applied per-line
-        const segs = []; // {t, b}
-        text.split(/(\*\*\*[\s\S]*?\*\*\*)/).forEach(p => {
-          if(p.startsWith("***") && p.endsWith("***")) segs.push({t: p.slice(3,-3), b:true});
-          else if(p) segs.push({t: p, b:false});
+        const words = [];
+        prefix.split(/\s+/).forEach(w => { if(w) words.push({w, b:true}); });
+        segs.forEach(seg => {
+          seg.t.split(/\s+/).forEach(w => { if(w) words.push({w, b:seg.b}); });
         });
-        const plain = segs.map(s=>s.t).join("");
-        const prefix = roman + ": ";
-        const lines = doc.splitTextToSize(prefix + plain, TW);
-
-        // Walk lines; for each line find which chars are bold using segs
-        const boldArr = []; // boldArr[i] = true if char i of plain is bold
-        segs.forEach(s => { for(let i=0;i<s.t.length;i++) boldArr.push(s.b); });
-
-        let plainPos = 0; // position in plain text
-        lines.forEach((line, li) => {
-          newPageIfNeeded(LEAD);
-          let cx = ML;
-          if(li === 0){
-            // draw bold prefix first
-            doc.setFont("helvetica","bold");
-            const pw = doc.getTextWidth(prefix);
-            doc.text(prefix, cx, cy);
-            cx += pw;
-            // body part of first line
-            const bodyPart = line.slice(prefix.length);
-            drawBoldRuns(cx, cy, bodyPart, boldArr, plainPos);
-            plainPos += bodyPart.length;
-          } else {
-            drawBoldRuns(cx, cy, line, boldArr, plainPos);
-            plainPos += line.length;
-          }
+        doc.setFont("helvetica","normal");
+        const spW = doc.getTextWidth(" ");
+        const lines2 = []; let cur=[], curW=0;
+        words.forEach(tok => {
+          doc.setFont("helvetica", tok.b?"bold":"normal");
+          const w = doc.getTextWidth(tok.w);
+          const gap = cur.length ? spW : 0;
+          if(cur.length && curW+gap+w > TW){ lines2.push(cur); cur=[tok]; curW=w; }
+          else { cur.push(tok); curW+=gap+w; }
+        });
+        if(cur.length) lines2.push(cur);
+        lines2.forEach(lineWords => {
+          check(LEAD);
+          const runs = [];
+          lineWords.forEach(tok => {
+            if(runs.length && runs[runs.length-1].b===tok.b) runs[runs.length-1].t+=" "+tok.w;
+            else runs.push({t:tok.w, b:tok.b});
+          });
+          let x = ML;
+          runs.forEach((run, ri) => {
+            doc.setFont("helvetica", run.b?"bold":"normal");
+            doc.text(run.t, x, cy);
+            x += doc.getTextWidth(run.t);
+            const nxt = runs[ri+1];
+            if(ri < runs.length-1 && !/^[,.;:!?)]/.test(nxt.t)) x += spW;
+          });
           cy += LEAD;
         });
       }
-      cy += LEAD * 0.5;
+      cy += LEAD*0.4;
       doc.setFont("helvetica","normal");
     }
-
-    function drawBoldRuns(startX, y, str, boldArr, offset){
-      // Group consecutive chars with same boldness into runs, draw each run
-      let cx = startX;
-      let runStart = 0;
-      for(let i = 0; i <= str.length; i++){
-        const curBold = i < str.length ? (boldArr[offset + i] || false) : null;
-        const prevBold = i > 0 ? (boldArr[offset + i - 1] || false) : null;
-        if(i === str.length || (i > 0 && curBold !== prevBold)){
-          const chunk = str.slice(runStart, i);
-          if(chunk){
-            doc.setFont("helvetica", prevBold ? "bold" : "normal");
-            doc.text(chunk, cx, y);
-            cx += doc.getTextWidth(chunk);
-          }
-          runStart = i;
-        }
-      }
-    }
-
-    function drawSignature(name){
-      newPageIfNeeded(35);
-      // Dashed box 84mm wide x 14mm tall (70% of original)
-      const boxW = 84, boxH = 14;
-      const boxX = ML + (TW - boxW) / 2;
-      doc.setLineDashPattern([2, 1.5], 0);
-      doc.setLineWidth(0.3);
-      doc.rect(boxX, cy, boxW, boxH);
-      doc.setLineDashPattern([], 0);
-      cy += boxH + 1.5;
-      // Signature line
-      const sig = "_".repeat(48);
-      doc.setFont("helvetica","normal");
-      doc.setFontSize(FS);
-      doc.text(sig, PW/2, cy, {align:"center"});
-      cy += LEAD;
-      doc.text(name, PW/2, cy, {align:"center"});
-      cy += LEAD;
-    }
-
-    // Title
-    drawParagraph("Contrato de Locação não residencial", {bold:true, align:"center", size:11, after:LEAD*0.8});
-
-    const loc = LOCADORES[selectedLocador];
-    // Intro
-    drawParagraph(
-      `Pelo presente instrumento particular, de um lado, como LOCADOR, ${loc.nome}, RG(CIN) ${loc.rg}, CPF ${loc.cpf}, ${loc.nac}, ${loc.ecivil}, ${loc.prof}, residente e domiciliado no endereço ${loc.end} e, de outro lado, como LOCATÁRIO, ${f.nome}, ${f.nac}, ${f.ecivil}, ${f.prof}, RG ${f.rg}, inscrito sob o CPF ${f.cpf}, residente e domiciliado em ${f.rua}, ${f.numend}, ${f.bairro} - ${f.cidade} ${f.estado} - CEP ${f.cep}, resolvem celebrar o presente contrato de locação, o qual reger-se-á pelas seguintes cláusulas e condições:`,
-      {after:LEAD*1.0}
-    );
 
     const clauses = [
       ["I. OBJETO", `Constitui objeto do presente contrato a locação do imóvel situado na Rodovia Santa Cruz, ${f.numimovel}, Praia Grande, Fundão - ES, composto na parte em questão por 1 sala com aproximadamente 10 m².`],
@@ -2391,29 +2415,44 @@ async function generateContractPDF(){
       ["XI. DESPESAS DE CONDOMÍNIO, CONSUMO E TAXAS", `Todas as despesas decorrentes da locação, quais sejam, consumo de água, luz, telefone e gás, ficam a cargo do locatário, cabendo-lhe efetuar diretamente esses pagamentos nas devidas épocas. O valor será acordado entre taxa mínima ou medição, de acordo com o nível do consumo.`],
       ["XII. VISTORIA", `O locatário desde já faculta ao locador examinar ou vistoriar o prédio, sempre que o segundo entender conveniente, desde que previamente acordados dia e hora.`],
       ["XIII. DEVOLUÇÃO DO IMÓVEL", `É de responsabilidade do locatário a devolução do imóvel em boas condições, sem danos ao piso, paredes e instalações. Em caso de entrega com dano carente de reforma em que o locatário falhe em reparar por conta própria, será contratado um prestador de serviços terceiro, com valor a ser pago pelo locatário.`],
-      ["XIV. FORO", `Para todas as questões decorrentes deste contrato, será competente o foro da situação do imóvel, seja qual for o domicílio dos contratantes.`],
+      ["XIV. DISPOSIÇÕES FINAIS", `As partes declaram que ***o presente instrumento representa a totalidade do acordo***, prevalecendo sobre quaisquer negociações, tratativas, promessas ou entendimentos anteriores, sejam orais ou escritos, que não estejam aqui expressamente descritos. Qualquer modificação deste contrato somente terá efeito se formalizada por escrito e assinada por ambas as partes. O LOCATÁRIO declara ter ciência de que ***este contrato possui prazo determinado de 1 ano,*** devendo portanto orientar seus investimentos, reformas, aquisição de equipamentos, contratações e demais decisões de negócio exclusivamente dentro do horizonte temporal aqui definido.`],
+      ["XV. FORO", `Para todas as questões decorrentes deste contrato, será competente o foro da situação do imóvel, seja qual for o domicílio dos contratantes.`],
     ];
 
-    clauses.forEach(([roman, text]) => drawClause(roman, text));
+    // Cabeçalho
+    para("Contrato de Locação não residencial", {bold:true, center:true, sz:11, after:LEAD});
+    para(`Pelo presente instrumento particular, de um lado, como LOCADOR, ${loc.nome}, RG(CIN) ${loc.rg}, CPF ${loc.cpf}, ${loc.nac}, ${loc.ecivil}, ${loc.prof}, residente e domiciliado no endereço ${loc.end} e, de outro lado, como LOCATÁRIO, ${f.nome}, ${f.nac}, ${f.ecivil}, ${f.prof}, RG ${f.rg}, inscrito sob o CPF ${f.cpf}, residente e domiciliado em ${f.rua}, ${f.numend}, ${f.bairro} - ${f.cidade} ${f.estado} - CEP ${f.cep}, resolvem celebrar o presente contrato de locação, o qual reger-se-á pelas seguintes cláusulas e condições:`, {after:LEAD});
 
-    drawParagraph("E, por estarem, assim ajustados, assinam o presente contrato.", {after:LEAD*1.5});
-    drawParagraph(`Fundão, ${dataAssinatura}.`, {align:"center", after:LEAD*2.5});
+    clauses.forEach(([r,b]) => clause(r,b));
 
-    drawSignature(loc.nome);
-    cy += LEAD * 2;
-    drawSignature(f.nome);
+    para("E, por estarem, assim ajustados, assinam o presente contrato.", {after:LEAD*1.5});
+    para(`Fundão, ${dataAssinatura}.`, {center:true, after:LEAD*5});
 
-    // Output
+    // Assinaturas
+    check(40);
+    const boxW = 70, boxH = 18;
+    const box1X = ML + TW * 0.03;
+    const box2X = ML + TW * 0.53;
+    doc.setLineDashPattern([2, 1.5], 0);
+    doc.setLineWidth(0.3);
+    doc.setDrawColor(80, 80, 80); // cinza escuro
+    doc.rect(box1X, cy, boxW, boxH);
+    doc.rect(box2X, cy, boxW, boxH);
+    doc.setLineDashPattern([], 0);
+    doc.setDrawColor(0, 0, 0);
+    cy += boxH + 2;
+    doc.setFont("helvetica","normal"); doc.setFontSize(FS);
+    doc.setTextColor(0,0,0);
+    doc.text(loc.nome, box1X + boxW / 2, cy + LEAD * 0.5, {align:"center"});
+    doc.text(f.nome, box2X + boxW / 2, cy + LEAD * 0.5, {align:"center"});
+
+    // Download
     const pdfBlob = doc.output("blob");
     const isMobile = ('ontouchstart' in window)||navigator.maxTouchPoints>0;
     if(isMobile && navigator.share && navigator.canShare){
       try{
         const file = new File([pdfBlob],`Contrato_${f.nome.split(" ")[0]}.pdf`,{type:"application/pdf"});
-        if(navigator.canShare({files:[file]})){
-          await navigator.share({files:[file],title:"Contrato de Locação"});
-          toast("✅ Contrato gerado!");
-          return;
-        }
+        if(navigator.canShare({files:[file]})){ await navigator.share({files:[file],title:"Contrato de Locação"}); toast("✅ Contrato gerado!"); return; }
       }catch(e){}
     }
     const url = URL.createObjectURL(pdfBlob);
@@ -2424,8 +2463,7 @@ async function generateContractPDF(){
     toast("✅ Contrato gerado!");
 
   }catch(e){
-    err.textContent="Erro: "+e.message; err.style.display="block";
-    console.error(e);
+    err.textContent="Erro: "+e.message; err.style.display="block"; console.error(e);
   }finally{
     if(origBtn){ origBtn.disabled=false; origBtn.textContent="📄 Gerar PDF"; }
   }
@@ -2543,7 +2581,8 @@ async function generateContractDOCX(){
     ["XI. DESPESAS DE CONDOMÍNIO, CONSUMO E TAXAS", `Todas as despesas decorrentes da locação, quais sejam, consumo de água, luz, telefone e gás, ficam a cargo do locatário, cabendo-lhe efetuar diretamente esses pagamentos nas devidas épocas. O valor será acordado entre taxa mínima ou medição, de acordo com o nível do consumo.`],
     ["XII. VISTORIA", `O locatário desde já faculta ao locador examinar ou vistoriar o prédio, sempre que o segundo entender conveniente, desde que previamente acordados dia e hora.`],
     ["XIII. DEVOLUÇÃO DO IMÓVEL", `É de responsabilidade do locatário a devolução do imóvel em boas condições, sem danos ao piso, paredes e instalações. Em caso de entrega com dano carente de reforma em que o locatário falhe em reparar por conta própria, será contratado um prestador de serviços terceiro, com valor a ser pago pelo locatário.`],
-    ["XIV. FORO", `Para todas as questões decorrentes deste contrato, será competente o foro da situação do imóvel, seja qual for o domicílio dos contratantes.`],
+    ["XIV. DISPOSIÇÕES FINAIS", `As partes declaram que ***o presente instrumento representa a totalidade do acordo***, prevalecendo sobre quaisquer negociações, tratativas, promessas ou entendimentos anteriores, sejam orais ou escritos, que não estejam aqui expressamente descritos. Qualquer modificação deste contrato somente terá efeito se formalizada por escrito e assinada por ambas as partes. O LOCATÁRIO declara ter ciência de que ***este contrato possui prazo determinado de 1 ano,*** devendo portanto orientar seus investimentos, reformas, aquisição de equipamentos, contratações e demais decisões de negócio exclusivamente dentro do horizonte temporal aqui definido.`],
+    ["XV. FORO", `Para todas as questões decorrentes deste contrato, será competente o foro da situação do imóvel, seja qual for o domicílio dos contratantes.`],
   ];
 
   function sigBlock(name){
