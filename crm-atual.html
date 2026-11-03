@@ -1221,7 +1221,16 @@ function shiftMonth(delta){
 }
 
 // ── PERSIST ────────────────────────────────────────────────────────────────
-function saveState(){
+// "Dirty" = existem alterações locais que ainda NÃO foram confirmadas no Drive.
+// Enquanto estiver dirty, o local vence qualquer carregamento do Drive.
+const DIRTY_KEY = "energiacrm_dirty";
+let localRev = 0; // incrementa a cada alteração local
+let LOCAL_READY = Promise.resolve(); // resolve quando localStorage/IndexedDB foram carregados
+const isDirty = () => { try{ return localStorage.getItem(DIRTY_KEY)==="1"; }catch(_){ return false; } };
+function setDirty(v){ try{ v ? localStorage.setItem(DIRTY_KEY,"1") : localStorage.removeItem(DIRTY_KEY); }catch(_){} }
+
+// fromDrive=true: apenas espelha localmente dados que vieram do Drive (não marca dirty nem reenvia)
+function saveState(fromDrive=false){
   if(S._demo) return;
   const data = {
     tenants: S.tenants,
@@ -1235,12 +1244,15 @@ function saveState(){
   // 1) localStorage (primário)
   try { localStorage.setItem("energiacrm_data", JSON.stringify(data)); }
   catch(e){
-    const lite = {...data, photoHistory:{}};
+    const lite = {...data, photoHistory:{}, _lite:true}; // sem fotos — o IndexedDB guarda a versão completa
     try { localStorage.setItem("energiacrm_data", JSON.stringify(lite)); } catch(_){}
   }
   // 2) IndexedDB (backup local — mais robusto, não é limpo pelo browser)
   idbSave(data);
+  if(fromDrive) return;
   // 3) Drive (remoto) com debounce
+  localRev++;
+  setDirty(true);
   driveSaveDebounced();
 }
 
@@ -1255,6 +1267,7 @@ function loadState(){
     if(data.chargesHistory) S.chargesHistory = data.chargesHistory;
     if(data.photoHistory) S.photoHistory = data.photoHistory;
     if(data.edpPendente) S.edpPendente = data.edpPendente;
+    S._photosMissing = !!data._lite;
     if(S.edpHistory[CUR]) S.edp = S.edpHistory[CUR];
     if(S.chargesHistory[CUR]) S.charges = S.chargesHistory[CUR];
   }catch(e){ console.error("loadState error:", e); }
@@ -1297,7 +1310,9 @@ async function loadStateWithFallback(){
     try{ const r=localStorage.getItem("energiacrm_data"); return r?JSON.parse(r)._savedAt||0:0; }catch(_){ return 0; }
   })();
   const idbData = await idbLoad();
-  if(idbData && (idbData._savedAt||0) > localSavedAt){
+  const idbSavedAt = idbData ? (idbData._savedAt||0) : -1;
+  // Empate: prefere o IndexedDB se o localStorage estiver sem fotos (versão "lite")
+  if(idbData && (idbSavedAt > localSavedAt || (idbSavedAt === localSavedAt && S._photosMissing))){
     console.log("IndexedDB mais recente que localStorage — restaurando...");
     if(idbData.tenants) S.tenants = idbData.tenants;
     if(idbData.readings) S.readings = idbData.readings;
@@ -1305,6 +1320,7 @@ async function loadStateWithFallback(){
     if(idbData.chargesHistory) S.chargesHistory = idbData.chargesHistory;
     if(idbData.photoHistory) S.photoHistory = idbData.photoHistory;
     if(idbData.edpPendente) S.edpPendente = idbData.edpPendente;
+    S._photosMissing = false;
     if(S.edpHistory[CUR]) S.edp = S.edpHistory[CUR];
     if(S.chargesHistory[CUR]) S.charges = S.chargesHistory[CUR];
     // Sincroniza localStorage com IndexedDB
@@ -2347,7 +2363,7 @@ function driveRefreshOrLogin(){
         // Silent failed — remove overlay and show reconnect button for user to tap
         const o=document.getElementById("init-overlay"); if(o) o.remove();
         render();
-        driveSetStatus("err","toque em Reconectar para continuar");
+        driveSetStatus("err","toque em Reconectar para continuar"+(isDirty()?" (há alterações não enviadas)":""));
         document.getElementById("drive-reconnect-btn").style.display="";
         return;
       }
@@ -2430,17 +2446,21 @@ async function driveFindOrCreateFile(){
 }
 
 async function driveSave(){
-  if(!GDRIVE.token || !GDRIVE.fileId || GDRIVE.syncing) return;
+  if(!GDRIVE.token || !GDRIVE.fileId) return;
   if(S._demo){ toast('⚠️ Modo demo — dados não são salvos no Drive', true); return; }
+  // Já há um envio em andamento — reenvia quando ele terminar (antes a alteração era descartada)
+  if(GDRIVE.syncing){ GDRIVE.pendingSave = true; return; }
   GDRIVE.syncing = true;
   driveSetStatus("sync","salvando...");
+  const rev = localRev;
   const data = {
     tenants:S.tenants, readings:S.readings,
     edpHistory:S.edpHistory, chargesHistory:S.chargesHistory,
     photoHistory:S.photoHistory,
+    edpPendente:S.edpPendente || null,
     _savedAt: Date.now(),
   };
-  let ok = false;
+  let ok = false, authLost = false;
   for(let attempt=1; attempt<=3; attempt++){
     try{
       const blob = new Blob([JSON.stringify(data)],{type:"application/json"});
@@ -2451,8 +2471,12 @@ async function driveSave(){
         `https://www.googleapis.com/upload/drive/v3/files/${GDRIVE.fileId}?uploadType=multipart`,
         {method:"PATCH", body:form}
       );
-      if(r && r.ok){
+      // Sessão expirada (401): driveFetch já está renovando o token, e o driveLoad
+      // seguinte reenvia as alterações locais (continuam marcadas como dirty)
+      if(!r){ authLost = true; break; }
+      if(r.ok){
         ok = true;
+        if(rev === localRev) setDirty(false); // só limpa se nada mudou durante o envio
         const now = new Date().toLocaleTimeString("pt-BR",{hour:"2-digit",minute:"2-digit"});
         driveSetStatus("ok","salvo às "+now);
         try{
@@ -2463,21 +2487,24 @@ async function driveSave(){
         }catch(_){}
         break;
       }
+      console.warn(`driveSave tentativa ${attempt}: HTTP ${r.status}`);
     }catch(e){
       console.warn(`driveSave tentativa ${attempt} falhou:`, e.message);
-      if(attempt < 3) await new Promise(r=>setTimeout(r, attempt*2000)); // espera 2s, 4s
     }
+    if(attempt < 3) await new Promise(r=>setTimeout(r, attempt*2000)); // espera 2s, 4s
   }
-  if(!ok){
+  if(!ok && !authLost){
     driveSetStatus("err","erro ao salvar — tentando novamente em 30s");
     // agenda retry
     setTimeout(()=>{ if(GDRIVE.token && GDRIVE.fileId) driveSave(); }, 30000);
   }
   GDRIVE.syncing=false;
+  if(GDRIVE.pendingSave){ GDRIVE.pendingSave=false; driveSave(); }
 }
 
 async function driveLoad(){
   if(!GDRIVE.token || !GDRIVE.fileId) return;
+  await LOCAL_READY; // garante que o estado local já foi lido antes de comparar com o Drive
   driveSetStatus("sync","carregando...");
   try{
     const r = await driveFetch(
@@ -2488,34 +2515,22 @@ async function driveLoad(){
     if(!text || text.trim()===""){driveSetStatus("ok","pronto (vazio)");return;}
     const data = JSON.parse(text);
 
-    // Merge inteligente: nunca sobrescreve leituras locais mais recentes
-    const localSavedAt = (() => {
-      try{ const raw=localStorage.getItem("energiacrm_data"); return raw?JSON.parse(raw)._savedAt||0:0; }catch(_){ return 0; }
-    })();
-    const remoteSavedAt = data._savedAt || 0;
-
-    if(localSavedAt > remoteSavedAt && localSavedAt - remoteSavedAt < 5*60*1000){
-      // Local é mais recente por menos de 5 min — merge por readings (une os dois)
-      console.log("driveLoad: local mais recente, fazendo merge de readings");
-      if(data.tenants) S.tenants = data.tenants;
-      // Merge readings: mantém o mais recente por inquilino/mês
-      if(data.readings){
-        Object.keys(data.readings).forEach(tid=>{
-          if(!S.readings[tid]) S.readings[tid]=[];
-          (data.readings[tid]||[]).forEach(remoteRd=>{
-            const localRd = (S.readings[tid]||[]).find(r=>r.month===remoteRd.month);
-            if(!localRd) S.readings[tid].push(remoteRd); // só adiciona se não existe localmente
+    const dirty = isDirty();
+    if(dirty){
+      // Há alterações locais que ainda não chegaram ao Drive (ex.: sessão expirou
+      // durante o envio). O local vence; o Drive só completa o que falta localmente.
+      console.log("driveLoad: alterações locais pendentes — mantendo local e reenviando ao Drive");
+      if(S._photosMissing && data.photoHistory){
+        Object.entries(data.photoHistory).forEach(([m,byTenant])=>{
+          if(!S.photoHistory[m]) S.photoHistory[m]={};
+          Object.entries(byTenant||{}).forEach(([tid,ph])=>{
+            S.photoHistory[m][tid] = {...ph, ...(S.photoHistory[m][tid]||{})};
           });
         });
       }
-      if(data.edpHistory) S.edpHistory = {...data.edpHistory, ...S.edpHistory};
-      if(data.chargesHistory) S.chargesHistory = {...data.chargesHistory, ...S.chargesHistory};
-      if(data.photoHistory) S.photoHistory = {...(data.photoHistory||{}), ...S.photoHistory};
       if(data.edpPendente && !S.edpPendente) S.edpPendente = data.edpPendente;
-      // Salva o merge de volta no Drive imediatamente
-      saveState();
     } else {
-      // Drive é mais recente ou diferença grande — usa Drive como fonte da verdade
+      // Nada pendente localmente — Drive é a fonte da verdade (pode ter vindo de outro aparelho)
       if(data.tenants) S.tenants=data.tenants;
       if(data.readings) S.readings=data.readings;
       if(data.edpHistory) S.edpHistory=data.edpHistory;
@@ -2523,11 +2538,12 @@ async function driveLoad(){
       if(data.photoHistory) S.photoHistory=data.photoHistory;
       if(data.edpPendente) S.edpPendente=data.edpPendente;
     }
+    S._photosMissing = false;
 
     S.edp = S.edpHistory[CUR] || null;
     S.charges = S.chargesHistory[CUR] ? JSON.parse(JSON.stringify(S.chargesHistory[CUR])) : {};
-    // Atualiza localStorage e IndexedDB com dados do Drive
-    saveState();
+    // dirty: reenvia o local ao Drive; senão só espelha o Drive no localStorage/IndexedDB
+    saveState(!dirty);
     const now = new Date().toLocaleTimeString("pt-BR",{hour:"2-digit",minute:"2-digit"});
     driveSetStatus("ok","carregado às "+now);
     render();
@@ -2667,17 +2683,15 @@ function driveSaveDebounced(){
     document.getElementById("gh-token").value=p.t||"";
   }catch(e){}}
 
-  // Load local state only if Drive is NOT connected (offline fallback)
-  // If Drive is connected, skip localStorage and wait for Drive data
-  if(!savedDriveToken){
-    loadStateWithFallback(); // tenta localStorage + IndexedDB
-  }
+  // Sempre carrega o estado local (localStorage + IndexedDB). Com o Drive conectado,
+  // o driveLoad espera por isso para não perder alterações locais ainda não enviadas.
+  LOCAL_READY = loadStateWithFallback();
 
   // Set month label
   const lbl = document.getElementById("month-label");
   if(lbl) lbl.textContent = mlbl(CUR);
 
-  // Render immediately — if Drive connected, shows empty state briefly until Drive loads
+  // Render immediately com os dados locais; o Drive atualiza em seguida
   render();
   if(!savedDriveToken){
     const bar = document.getElementById("drive-bar");
